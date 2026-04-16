@@ -1,0 +1,348 @@
+/**
+ * yarrow.css — 蓍草占卜高级模式专用样式
+ * 包含：净手静心界面、Canvas容器、旁白文字、爻进度指示器
+ */
+
+/* ====== 蓍草模式整体容器 ====== */
+#yarrow-section {
+  position: relative;
+}
+
+/* 蓍草卡片需要更宽 */
+.yarrow-card {
+  max-width: 960px !important;
+}
+
+/* ====== 双栏布局 ====== */
+.yarrow-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+/* ====== 左栏：流程介绍 ====== */
+.yarrow-guide {
+  flex: 0 0 220px;
+  padding: 1.2rem;
+  background-color: rgba(192, 160, 98, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  position: sticky;
+  top: 2rem;
+}
+
+.guide-title {
+  color: var(--accent-gold);
+  font-size: 1.1rem;
+  margin-bottom: 0.6rem;
+  text-align: center;
+}
+
+.guide-intro {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.guide-step {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-left: 2px solid transparent;
+  transition: all 0.3s;
+}
+
+.guide-step.active-step {
+  background-color: rgba(192, 160, 98, 0.1);
+  border-left-color: var(--accent-gold);
+}
+
+.step-num {
+  flex: 0 0 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--accent-gold);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  margin-top: 2px;
+}
+
+.guide-step.active-step .step-num {
+  background-color: var(--accent-gold);
+  color: var(--bg-color);
+  border-color: var(--accent-gold);
+}
+
+.step-detail strong {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.step-detail p {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.guide-footer {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px dashed var(--border-color);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ====== 右栏：交互区域 ====== */
+.yarrow-interactive {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ====== 响应式：窄屏时切换为单栏 ====== */
+@media (max-width: 700px) {
+  .yarrow-layout {
+    flex-direction: column;
+  }
+  .yarrow-guide {
+    flex: none;
+    width: 100%;
+    position: static;
+  }
+  .yarrow-card {
+    max-width: 600px !important;
+  }
+}
+
+/* ====== 净手静心界面 ====== */
+.purify-container {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.purify-text {
+  font-size: 1.2rem;
+  color: var(--accent-gold);
+  margin-bottom: 1.5rem;
+  letter-spacing: 2px;
+}
+
+.purify-sub-text {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+/* 长按按钮 + 圆形进度环 */
+.purify-btn-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 1.5rem;
+}
+
+.purify-progress-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: 120px;
+  --progress: 0;
+}
+
+.purify-progress-ring svg {
+  width: 120px;
+  height: 120px;
+  transform: rotate(-90deg);
+}
+
+.purify-progress-ring .ring-bg {
+  fill: none;
+  stroke: var(--border-color);
+  stroke-width: 3;
+}
+
+.purify-progress-ring .ring-fill {
+  fill: none;
+  stroke: var(--accent-gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  /* 圆周 = 2 * π * r = 2 * 3.14159 * 54 ≈ 339.29 */
+  stroke-dasharray: 339.29;
+  stroke-dashoffset: calc(339.29 * (1 - var(--progress)));
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.purify-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background-color: var(--panel-bg);
+  color: var(--accent-gold);
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.purify-btn.holding {
+  background-color: rgba(192, 160, 98, 0.15);
+  box-shadow: 0 0 20px rgba(192, 160, 98, 0.3);
+}
+
+.purify-btn.completed {
+  background-color: rgba(192, 160, 98, 0.2);
+  color: var(--text-primary);
+  border-color: var(--accent-gold);
+}
+
+/* ====== Canvas 容器 ====== */
+.yarrow-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.yarrow-canvas-wrapper canvas {
+  display: block;
+  width: 100%;
+}
+
+/* ====== 旁白文字 ====== */
+.yarrow-narration {
+  text-align: center;
+  font-size: 1rem;
+  color: var(--accent-gold);
+  min-height: 2em;
+  padding: 0.8rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: 1px;
+  opacity: 0.9;
+  transition: opacity 0.3s;
+}
+
+/* ====== 爻进度指示器 ====== */
+.yao-progress {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.yao-progress .yao-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  transition: all 0.3s;
+}
+
+.yao-dot.active {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  box-shadow: 0 0 8px rgba(192, 160, 98, 0.4);
+}
+
+.yao-dot.done {
+  border-color: var(--accent-gold);
+  background-color: var(--accent-gold);
+  color: var(--bg-color);
+  font-weight: 700;
+}
+
+.yao-dot.changing {
+  border-color: #E8553A;
+  background-color: #E8553A;
+  color: #fff;
+}
+
+/* ====== 变进度文字 ====== */
+.change-progress {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+/* ====== 单爻结果展示条 ====== */
+.yao-result-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 0.6rem 1rem;
+  background-color: rgba(192, 160, 98, 0.08);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  transition: opacity 0.3s;
+}
+
+.yao-result-bar.changing-bar {
+  background-color: rgba(232, 85, 58, 0.12);
+  border-left: 3px solid #E8553A;
+}
+
+/* ====== "继续下一爻" 按钮 ====== */
+.yarrow-next-btn {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 0.8rem;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1px solid var(--accent-gold);
+  background-color: transparent;
+  color: var(--accent-gold);
+  letter-spacing: 2px;
+  margin-top: 0.5rem;
+  transition: all 0.3s;
+}
+
+.yarrow-next-btn:hover {
+  background-color: rgba(192, 160, 98, 0.1);
+}
+
+/* ====== 爻结果列表 ====== */
+.yao-results-list {
+  margin-top: 1rem;
+}

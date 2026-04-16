@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周易占卜 - 诚则灵</title>
+    <!-- 引入思源宋体，增强国风质感 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="yarrow.css">
+    <!-- 引入 html2canvas 进行截图分享 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="yi.svg" alt="周易太极" class="logo">
+            <h1>周易 · 国学解惑</h1>
+            <p class="tagline">人更三圣，世历三古。遇事不决，求之于易。</p>
+        </header>
+
+        <main>
+            <!-- 首页入口模块 -->
+            <section id="home-section" class="home-section active">
+                <button id="zhouyi-entry-btn" class="home-entry home-entry-primary">
+                    <span class="home-entry-kicker">以卦问事</span>
+                    <span class="home-entry-title">周易占事</span>
+                    <span class="home-entry-copy">为眼前一事起卦，观本卦、动爻与之卦，再请太公作古韵与大白话解读。</span>
+                </button>
+
+                <button id="bazi-entry-btn" class="home-entry">
+                    <span class="home-entry-kicker">以命观势</span>
+                    <span class="home-entry-title">八字星盘</span>
+                    <span class="home-entry-copy">填入出生年月日时，排出四柱、大运、五行强弱，再生成现代白话说明。</span>
+                </button>
+
+                <button id="shengxiao-entry-btn" class="home-entry">
+                    <span class="home-entry-kicker">以生肖合参</span>
+                    <span class="home-entry-title">生肖合婚</span>
+                    <span class="home-entry-copy">选择一个生肖，查看三合、六合、三会，以及冲、刑、害、破等关系。</span>
+                </button>
+
+                <button id="luohou-entry-btn" class="home-entry">
+                    <span class="home-entry-kicker">以日时择宜</span>
+                    <span class="home-entry-title">罗喉择日</span>
+                    <span class="home-entry-copy">选择起始日期，查看罗喉日时、九宫飞星、太岁岁破与风水择日辅助。</span>
+                </button>
+            </section>
+
+            <!-- 周易占事模块 -->
+            <section id="question-section" class="card hidden">
+                <div class="form-group">
+                    <label for="question">所问何事：</label>
+                    <textarea id="question" rows="4" placeholder="请在此写下您心中的疑惑或关切之事，例如：我想占卜近期的事业发展，或者我应不应该接受这份新工作机会？"></textarea>
+                </div>
+                <button id="divine-btn" class="primary-btn">沐手起卦</button>
+                <button id="yarrow-btn" class="secondary-btn" style="margin-top: 0.8rem;">蓍草起卦（高级）</button>
+                <button id="zhouyi-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
+            </section>
+
+            <!-- 八字星盘模块 -->
+            <section id="bazi-section" class="card hidden">
+                <h2 class="section-title">八字星盘</h2>
+                <p class="section-intro">填入出生时间，排出四柱、大运、五行强弱与刑冲合害。</p>
+
+                <div class="bazi-grid">
+                    <div class="form-group">
+                        <label for="bazi-calendar">历法：</label>
+                        <select id="bazi-calendar">
+                            <option value="solar">公历</option>
+                            <option value="lunar">农历</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bazi-gender">性别：</label>
+                        <select id="bazi-gender">
+                            <option value="male">男命</option>
+                            <option value="female">女命</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bazi-year">年：</label>
+                        <input id="bazi-year" type="number" min="1850" max="2030" placeholder="1990">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bazi-month">月：</label>
+                        <input id="bazi-month" type="number" min="1" max="12" placeholder="5">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bazi-day">日：</label>
+                        <input id="bazi-day" type="number" min="1" max="31" placeholder="12">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bazi-hour">时：</label>
+                        <input id="bazi-hour" type="number" min="0" max="23" placeholder="9">
+                    </div>
+                </div>
+
+                <label class="checkbox-row" for="bazi-leap-month">
+                    <input id="bazi-leap-month" type="checkbox">
+                    <span>农历闰月</span>
+                </label>
+
+                <button id="bazi-submit-btn" class="primary-btn">排盘</button>
+
+                <div id="bazi-reverse-form" class="bazi-subform">
+                    <h3 class="interpretation-title">四柱反推</h3>
+                    <p class="section-intro">已知四柱时，输入年柱、月柱、日柱、时柱，反推可能出生时间。</p>
+
+                    <div class="bazi-grid">
+                        <div class="form-group">
+                            <label for="reverse-year-pillar">年柱：</label>
+                            <input id="reverse-year-pillar" type="text" maxlength="2" placeholder="丁巳">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reverse-month-pillar">月柱：</label>
+                            <input id="reverse-month-pillar" type="text" maxlength="2" placeholder="己酉">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reverse-day-pillar">日柱：</label>
+                            <input id="reverse-day-pillar" type="text" maxlength="2" placeholder="癸未">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reverse-hour-pillar">时柱：</label>
+                            <input id="reverse-hour-pillar" type="text" maxlength="2" placeholder="壬戌">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reverse-start-year">起始年份：</label>
+                            <input id="reverse-start-year" type="number" min="1" max="9999" value="1850">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reverse-end-year">结束年份：</label>
+                            <input id="reverse-end-year" type="number" min="1" max="9999" value="2030">
+                        </div>
+                    </div>
+
+                    <button id="bazi-reverse-submit-btn" class="secondary-btn bazi-reverse-submit-btn">反推可能出生时间</button>
+                </div>
+
+                <button id="bazi-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
+
+                <div id="bazi-result-wrapper" class="bazi-result-wrapper" style="display: none;">
+                    <h3 id="bazi-result-title" class="interpretation-title">排盘结果</h3>
+                    <pre id="bazi-result" class="bazi-result"></pre>
+                    <button id="bazi-interpret-btn" class="primary-btn bazi-interpret-btn" style="display: none;">生成大白话解读</button>
+
+                    <div id="bazi-interpret-wrapper" class="bazi-interpret-wrapper" style="display: none;">
+                        <h3 class="interpretation-title">大白话解读</h3>
+                        <div id="bazi-interpret-content" class="content-box">
+                            <span class="cursor" id="bazi-typer-cursor"></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 生肖合婚模块 -->
+            <section id="shengxiao-section" class="card hidden">
+                <h2 class="section-title">生肖合婚</h2>
+                <p class="section-intro">选择生肖，查看相合与不合的生肖关系。</p>
+
+                <div class="form-group">
+                    <label for="shengxiao-select">你的生肖：</label>
+                    <select id="shengxiao-select">
+                        <option value="鼠">鼠</option>
+                        <option value="牛">牛</option>
+                        <option value="虎">虎</option>
+                        <option value="兔">兔</option>
+                        <option value="龙">龙</option>
+                        <option value="蛇">蛇</option>
+                        <option value="马">马</option>
+                        <option value="羊">羊</option>
+                        <option value="猴">猴</option>
+                        <option value="鸡">鸡</option>
+                        <option value="狗">狗</option>
+                        <option value="猪">猪</option>
+                    </select>
+                </div>
+
+                <button id="shengxiao-submit-btn" class="primary-btn">查看合婚关系</button>
+                <button id="shengxiao-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
+
+                <div id="shengxiao-result-wrapper" class="bazi-result-wrapper" style="display: none;">
+                    <h3 class="interpretation-title">合婚结果</h3>
+                    <pre id="shengxiao-result" class="bazi-result"></pre>
+                </div>
+            </section>
+
+            <!-- 罗喉择日模块 -->
+            <section id="luohou-section" class="card hidden">
+                <h2 class="section-title">罗喉择日</h2>
+                <div class="luohou-layout">
+                    <div class="luohou-form-panel">
+                        <div class="bazi-grid">
+                            <div class="form-group">
+                                <label for="luohou-date">起始日期：</label>
+                                <input id="luohou-date" type="date">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="luohou-days">查询天数：</label>
+                                <input id="luohou-days" type="number" min="1" max="90" value="15">
+                            </div>
+                        </div>
+
+                        <button id="luohou-submit-btn" class="primary-btn">查看择日辅助</button>
+                        <button id="luohou-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
+                    </div>
+
+                    <aside class="luohou-intro-panel">
+                        <h3 class="interpretation-title">罗喉择日说明</h3>
+                        <p>用于查看指定日期范围内的罗喉日时、九宫飞星、岁破月破与风水择日辅助。</p>
+                        <p>结果适合作为传统文化参考，实际安排还要结合现实条件、天气、人员与安全。</p>
+                    </aside>
+                </div>
+
+                <div id="luohou-result-wrapper" class="bazi-result-wrapper" style="display: none;">
+                    <h3 class="interpretation-title">择日结果</h3>
+                    <pre id="luohou-result" class="bazi-result"></pre>
+                    <button id="luohou-interpret-btn" class="primary-btn bazi-interpret-btn" style="display: none;">生成大白话解读</button>
+
+                    <div id="luohou-interpret-wrapper" class="bazi-interpret-wrapper" style="display: none;">
+                        <h3 class="interpretation-title">大白话解读</h3>
+                        <div id="luohou-interpret-content" class="content-box">
+                            <span class="cursor" id="luohou-typer-cursor"></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 动画起卦模块 -->
+            <section id="animation-section" class="card hidden">
+                <div class="divination-animation">
+                    <div class="taiji-spin"></div>
+                    <h2 class="animate-text">推演六爻流转中...</h2>
+                    <p class="sub-animate-text">大衍之数五十，其用四十有九，分而为二...</p>
+                </div>
+            </section>
+
+            <!-- 蓍草模式 -->
+            <section id="yarrow-section" class="card hidden yarrow-card">
+                <div class="yarrow-layout">
+                    <!-- 左侧：流程介绍 -->
+                    <aside class="yarrow-guide">
+                        <h3 class="guide-title">📜 蓍草起卦法</h3>
+                        <p class="guide-intro">源自《周易·系辞传》，古称"大衍筮法"，是最正统的起卦方式。</p>
+                        
+                        <div class="guide-steps">
+                            <div class="guide-step" id="guide-step-0">
+                                <span class="step-num">〇</span>
+                                <div class="step-detail">
+                                    <strong>净手静心</strong>
+                                    <p>焚香沐手，诚心默念所求之事</p>
+                                </div>
+                            </div>
+                            <div class="guide-step" id="guide-step-1">
+                                <span class="step-num">一</span>
+                                <div class="step-detail">
+                                    <strong>取蓍</strong>
+                                    <p>大衍之数五十，其用四十有九</p>
+                                </div>
+                            </div>
+                            <div class="guide-step" id="guide-step-2">
+                                <span class="step-num">二</span>
+                                <div class="step-detail">
+                                    <strong>分二</strong>
+                                    <p>信手将蓍草分为左右两堆，以象两仪</p>
+                                </div>
+                            </div>
+                            <div class="guide-step" id="guide-step-3">
+                                <span class="step-num">三</span>
+                                <div class="step-detail">
+                                    <strong>挂一</strong>
+                                    <p>从右堆取一根挂于指间，以象三才</p>
+                                </div>
+                            </div>
+                            <div class="guide-step" id="guide-step-4">
+                                <span class="step-num">四</span>
+                                <div class="step-detail">
+                                    <strong>揲四</strong>
+                                    <p>左右两堆各以四根一组计数，以象四时</p>
+                                </div>
+                            </div>
+                            <div class="guide-step" id="guide-step-5">
+                                <span class="step-num">五</span>
+                                <div class="step-detail">
+                                    <strong>归奇</strong>
+                                    <p>将余数归拢一旁，以象闰月</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="guide-footer">每爻经三变而成，六爻十八变，方得一卦。</p>
+                    </aside>
+
+                    <!-- 右侧：交互区域 -->
+                    <div class="yarrow-interactive">
+                        <!-- 净手静心 -->
+                        <div id="yarrow-purify" class="purify-container">
+                            <p class="purify-text">占卦前，请静心默念所求之事</p>
+                            <p class="purify-sub-text">长按下方圆盘三秒，凝神静气</p>
+                            <div class="purify-btn-wrapper">
+                                <div id="purify-progress" class="purify-progress-ring">
+                                    <svg viewBox="0 0 120 120">
+                                        <circle class="ring-bg" cx="60" cy="60" r="54" />
+                                        <circle class="ring-fill" cx="60" cy="60" r="54" />
+                                    </svg>
+                                </div>
+                                <button id="purify-btn" class="purify-btn">按住<br>凝神</button>
+                            </div>
+                        </div>
+
+                        <!-- 推演区域（净手完成后显示） -->
+                        <div id="yarrow-play" style="display: none;">
+                            <!-- 爻进度指示器 -->
+                            <div class="yao-progress" id="yao-progress-dots">
+                                <div class="yao-dot" data-yao="0">初</div>
+                                <div class="yao-dot" data-yao="1">二</div>
+                                <div class="yao-dot" data-yao="2">三</div>
+                                <div class="yao-dot" data-yao="3">四</div>
+                                <div class="yao-dot" data-yao="4">五</div>
+                                <div class="yao-dot" data-yao="5">上</div>
+                            </div>
+
+                            <!-- 变进度 -->
+                            <div class="change-progress" id="change-progress">准备开始</div>
+
+                            <!-- Canvas 画布 -->
+                            <div class="yarrow-canvas-wrapper">
+                                <canvas id="yarrow-canvas"></canvas>
+                            </div>
+
+                            <!-- 旁白文字 -->
+                            <div class="yarrow-narration" id="yarrow-narration">大衍之数五十，其用四十有九</div>
+
+                            <!-- 爻结果列表 -->
+                            <div class="yao-results-list" id="yao-results-list"></div>
+
+                            <!-- 操作按钮 -->
+                            <div style="display: flex; gap: 10px; margin-top: 0.5rem; width: 100%;">
+                                <button id="yarrow-next-btn" class="yarrow-next-btn" style="display: none; flex: 1;">继续下一爻</button>
+                                <button id="yarrow-skip-btn" class="yarrow-next-btn" style="flex: 1; border-color: var(--text-secondary); color: var(--text-secondary);">跳过动画</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 结果占卜模块 -->
+            <section id="result-section" class="card hidden">
+                <!-- 卦象部分 -->
+                <div class="hexagram-display">
+                    <h2 id="hexagram-title" class="elegant-title">...</h2>
+                    <div id="hexagram-lines" class="lines-container">
+                        <!-- 爻线将由 JS 动态生成 -->
+                    </div>
+                    <div id="hexagram-desc" class="yao-desc">
+                        <!-- 六爻文字说明由 JS 生成 -->
+                    </div>
+                    <!-- 动爻警示 -->
+                    <div id="changing-warning" class="changing-warning" style="display: none;">
+                        <!-- 动爻提示由 JS 动态生成 -->
+                    </div>
+                    <!-- 之卦展示 -->
+                    <div id="changed-hexagram" class="changed-hexagram-display" style="display: none;">
+                        <h3 class="changed-title">→ 之卦（变卦）</h3>
+                        <p id="changed-hexagram-title" class="changed-hex-name"></p>
+                        <div id="changed-hexagram-lines" class="lines-container changed-lines"></div>
+                    </div>
+                    <!-- 新增：手动触发解卦的按钮 -->
+                    <button id="interpret-btn" class="primary-btn" style="margin-top: 1.5rem; display: none;">请太公解卦</button>
+                </div>
+
+                <!-- AI 解读部分 -->
+                <div id="interpretation-wrapper" style="display: none;">
+                    <div class="interpretation-display">
+                        <h3 class="interpretation-title">太公解卦（古韵解析）</h3>
+                        <div id="interpretation-content" class="content-box">
+                            <span class="cursor" id="typer-cursor"></span>
+                        </div>
+                    </div>
+
+                    <div class="interpretation-display" style="margin-top: 1.5rem;">
+                        <h3 class="interpretation-title">太公解卦（大白话）</h3>
+                        <div id="interpretation-content-modern" class="content-box">
+                            <span class="cursor hidden" id="typer-cursor-modern"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer-actions" id="result-actions">
+                    <button id="reset-btn" class="secondary-btn">再起一卦</button>
+                    <button id="share-btn" class="secondary-btn share-btn-style">保存分享图</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="yarrow.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
