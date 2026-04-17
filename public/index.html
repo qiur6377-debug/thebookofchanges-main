@@ -22,29 +22,50 @@
         <main>
             <!-- 首页入口模块 -->
             <section id="home-section" class="home-section active">
-                <button id="zhouyi-entry-btn" class="home-entry home-entry-primary">
-                    <span class="home-entry-kicker">以卦问事</span>
-                    <span class="home-entry-title">周易占事</span>
-                    <span class="home-entry-copy">为眼前一事起卦，观本卦、动爻与之卦，再请太公作古韵与大白话解读。</span>
-                </button>
+                <div class="hero-panel">
+                    <span class="hero-kicker">以卦问事，以命观势</span>
+                    <h2 class="hero-title">周易 · 国学解惑</h2>
+                    <p class="hero-copy">遇事先起一卦，看当下之势。若想再看深一层，也可排八字、观生肖、择时日。</p>
+                    <div class="hero-actions">
+                        <button id="zhouyi-entry-btn" class="primary-btn hero-primary-btn">开始起卦</button>
+                    </div>
+                    <p class="hero-fit-list">适合：事业、感情、选择、合作、时机判断</p>
+                </div>
 
-                <button id="bazi-entry-btn" class="home-entry">
-                    <span class="home-entry-kicker">以命观势</span>
-                    <span class="home-entry-title">八字星盘</span>
-                    <span class="home-entry-copy">填入出生年月日时，排出四柱、大运、五行强弱，再生成现代白话说明。</span>
-                </button>
+                <div class="home-subgrid">
+                    <button id="bazi-entry-btn" class="home-entry">
+                        <span class="home-entry-kicker">以命观势</span>
+                        <span class="home-entry-title">八字星盘</span>
+                        <span class="home-entry-copy">填入出生年月日时，查看四柱、大运、五行强弱与命盘格局。</span>
+                    </button>
 
-                <button id="shengxiao-entry-btn" class="home-entry">
-                    <span class="home-entry-kicker">以生肖合参</span>
-                    <span class="home-entry-title">生肖合婚</span>
-                    <span class="home-entry-copy">选择一个生肖，查看三合、六合、三会，以及冲、刑、害、破等关系。</span>
-                </button>
+                    <button id="shengxiao-entry-btn" class="home-entry">
+                        <span class="home-entry-kicker">以生肖合参</span>
+                        <span class="home-entry-title">生肖合婚</span>
+                        <span class="home-entry-copy">快速查看三合、六合、冲、刑、害、破，适合轻量参考关系。</span>
+                    </button>
 
-                <button id="luohou-entry-btn" class="home-entry">
-                    <span class="home-entry-kicker">以日时择宜</span>
-                    <span class="home-entry-title">罗喉择日</span>
-                    <span class="home-entry-copy">选择起始日期，查看罗喉日时、九宫飞星、太岁岁破与风水择日辅助。</span>
-                </button>
+                    <button id="luohou-entry-btn" class="home-entry">
+                        <span class="home-entry-kicker">以日时择宜</span>
+                        <span class="home-entry-title">罗喉择日</span>
+                        <span class="home-entry-copy">查看起始日期内的罗喉日时与择日辅助，判断时间窗口。</span>
+                    </button>
+                </div>
+
+                <div class="method-summary">
+                    <div class="method-item">
+                        <span class="method-title">占事</span>
+                        <span class="method-copy">问眼前一事，适合做选择</span>
+                    </div>
+                    <div class="method-item">
+                        <span class="method-title">观命</span>
+                        <span class="method-copy">看长期格局，适合理解自己</span>
+                    </div>
+                    <div class="method-item">
+                        <span class="method-title">择时</span>
+                        <span class="method-copy">看时间窗口，适合安排节奏</span>
+                    </div>
+                </div>
             </section>
 
             <!-- 周易占事模块 -->
@@ -52,9 +73,16 @@
                 <div class="form-group">
                     <label for="question">所问何事：</label>
                     <textarea id="question" rows="4" placeholder="请在此写下您心中的疑惑或关切之事，例如：我想占卜近期的事业发展，或者我应不应该接受这份新工作机会？"></textarea>
+                    <div class="question-templates" aria-label="常用问事示例">
+                        <button type="button" class="question-template-btn" data-question-template="事业选择" data-question="我最近在事业发展上有些犹豫，想知道眼前这个选择是否适合推进？">事业选择</button>
+                        <button type="button" class="question-template-btn" data-question-template="感情关系" data-question="我想看看这段感情接下来的走势，以及我现在应该如何处理彼此关系？">感情关系</button>
+                        <button type="button" class="question-template-btn" data-question-template="合作判断" data-question="我正在考虑一次合作或合伙机会，想知道这件事是否值得继续推进？">合作判断</button>
+                        <button type="button" class="question-template-btn" data-question-template="时机安排" data-question="我想判断近期是否适合启动这件重要事情，还是应该再等等？">时机安排</button>
+                    </div>
                 </div>
-                <button id="divine-btn" class="primary-btn">沐手起卦</button>
-                <button id="yarrow-btn" class="secondary-btn" style="margin-top: 0.8rem;">蓍草起卦（高级）</button>
+                <div id="zhouyi-message" class="form-message" role="alert" aria-live="polite"></div>
+                <button id="divine-btn" class="primary-btn">沐手起卦（快速占卜）</button>
+                <button id="yarrow-btn" class="secondary-btn" style="margin-top: 0.8rem;">大衍筮法（古法蓍草推演）</button>
                 <button id="zhouyi-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
             </section>
 
@@ -106,6 +134,7 @@
                     <span>农历闰月</span>
                 </label>
 
+                <div id="bazi-message" class="form-message" role="alert" aria-live="polite"></div>
                 <button id="bazi-submit-btn" class="primary-btn">排盘</button>
 
                 <div id="bazi-reverse-form" class="bazi-subform">
@@ -151,14 +180,24 @@
 
                 <div id="bazi-result-wrapper" class="bazi-result-wrapper" style="display: none;">
                     <h3 id="bazi-result-title" class="interpretation-title">排盘结果</h3>
-                    <pre id="bazi-result" class="bazi-result"></pre>
-                    <button id="bazi-interpret-btn" class="primary-btn bazi-interpret-btn" style="display: none;">生成大白话解读</button>
+                    <div id="bazi-result-cards" class="structured-result-list"></div>
+                    <details class="raw-result-details">
+                        <summary>查看原始排盘</summary>
+                        <pre id="bazi-result" class="bazi-result"></pre>
+                    </details>
+                    <button id="bazi-interpret-btn" class="primary-btn bazi-interpret-btn" style="display: none;">帮我看懂这张命盘</button>
 
                     <div id="bazi-interpret-wrapper" class="bazi-interpret-wrapper" style="display: none;">
                         <h3 class="interpretation-title">大白话解读</h3>
                         <div id="bazi-interpret-content" class="content-box">
                             <span class="cursor" id="bazi-typer-cursor"></span>
                         </div>
+                    </div>
+
+                    <div id="bazi-zhouyi-recommendation" class="flow-recommendation" style="display: none;">
+                        <h3>🔮 有具体事情想决策？</h3>
+                        <p>命盘显示先天格局，但眼前一事需看当下之势。可为眼前具体疑惑起一卦，观本卦、动爻与之卦。</p>
+                        <button id="recommend-zhouyi-btn" class="flow-recommendation-btn">周易起卦</button>
                     </div>
                 </div>
             </section>
@@ -187,11 +226,22 @@
                 </div>
 
                 <button id="shengxiao-submit-btn" class="primary-btn">查看合婚关系</button>
+                <div id="shengxiao-message" class="form-message" role="alert" aria-live="polite"></div>
                 <button id="shengxiao-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
 
                 <div id="shengxiao-result-wrapper" class="bazi-result-wrapper" style="display: none;">
                     <h3 class="interpretation-title">合婚结果</h3>
-                    <pre id="shengxiao-result" class="bazi-result"></pre>
+                    <div id="shengxiao-result-cards" class="structured-result-list"></div>
+                    <details class="raw-result-details">
+                        <summary>查看原始结果</summary>
+                        <pre id="shengxiao-result" class="bazi-result"></pre>
+                    </details>
+
+                    <div id="shengxiao-luohou-recommendation" class="flow-recommendation" style="display: none;">
+                        <h3>📅 想选个好日子推进此事？</h3>
+                        <p>若关系合适，可择吉日行事；若关系有冲，可择日化解或避开。查看近期罗喉日时与宜忌。</p>
+                        <button id="recommend-luohou-btn" class="flow-recommendation-btn">罗喉择日</button>
+                    </div>
                 </div>
             </section>
 
@@ -213,6 +263,8 @@
                         </div>
 
                         <button id="luohou-submit-btn" class="primary-btn">查看择日辅助</button>
+                        <button id="luohou-single-day-btn" class="secondary-btn compact-secondary-btn">只查这一天</button>
+                        <div id="luohou-message" class="form-message" role="alert" aria-live="polite"></div>
                         <button id="luohou-back-btn" class="secondary-btn compact-secondary-btn">返回首页</button>
                     </div>
 
@@ -225,8 +277,12 @@
 
                 <div id="luohou-result-wrapper" class="bazi-result-wrapper" style="display: none;">
                     <h3 class="interpretation-title">择日结果</h3>
-                    <pre id="luohou-result" class="bazi-result"></pre>
-                    <button id="luohou-interpret-btn" class="primary-btn bazi-interpret-btn" style="display: none;">生成大白话解读</button>
+                    <div id="luohou-result-cards" class="structured-result-list"></div>
+                    <details class="raw-result-details">
+                        <summary>查看原始择日</summary>
+                        <pre id="luohou-result" class="bazi-result"></pre>
+                    </details>
+                    <button id="luohou-interpret-btn" class="primary-btn bazi-interpret-btn" style="display: none;">帮我解释这些日子</button>
 
                     <div id="luohou-interpret-wrapper" class="bazi-interpret-wrapper" style="display: none;">
                         <h3 class="interpretation-title">大白话解读</h3>
@@ -395,10 +451,23 @@
                             <span class="cursor hidden" id="typer-cursor-modern"></span>
                         </div>
                     </div>
+
+                    <div id="zhouyi-bazi-recommendation" class="flow-recommendation" style="display: none;">
+                        <h3>👤 想更深入了解自己？</h3>
+                        <p>刚才的卦象指引了当下之势。若想知晓先天格局与长期运势，可排八字命盘，观四柱、大运与五行强弱。</p>
+                        <button id="recommend-bazi-btn" class="flow-recommendation-btn">查看八字星盘</button>
+                    </div>
+
+                    <div id="zhouyi-shengxiao-recommendation" class="flow-recommendation" style="display: none;">
+                        <h3>💑 想知道TA和你的契合度？</h3>
+                        <p>若此事涉及与人合作，可查看生肖合婚，了解双方三合、六合或冲克关系。</p>
+                        <button id="recommend-shengxiao-btn" class="flow-recommendation-btn">生肖合婚查询</button>
+                    </div>
                 </div>
 
                 <div class="footer-actions" id="result-actions">
                     <button id="reset-btn" class="secondary-btn">再起一卦</button>
+                    <button id="result-home-btn" class="secondary-btn">返回首页</button>
                     <button id="share-btn" class="secondary-btn share-btn-style">保存分享图</button>
                 </div>
             </section>

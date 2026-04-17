@@ -16,8 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const luohouEntryBtn = document.getElementById('luohou-entry-btn');
     const zhouyiBackBtn = document.getElementById('zhouyi-back-btn');
     const questionInput = document.getElementById('question');
+    const questionTemplateBtns = document.querySelectorAll('.question-template-btn');
+    const zhouyiMessage = document.getElementById('zhouyi-message');
     const divineBtn = document.getElementById('divine-btn');
     const resetBtn = document.getElementById('reset-btn');
+    const resultHomeBtn = document.getElementById('result-home-btn');
     
     const hexTitle = document.getElementById('hexagram-title');
     const hexLinesContainer = document.getElementById('hexagram-lines');
@@ -32,6 +35,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const changedHexagram = document.getElementById('changed-hexagram');
     const changedHexTitle = document.getElementById('changed-hexagram-title');
     const changedHexLines = document.getElementById('changed-hexagram-lines');
+    const zhouyiBaziRecommendation = document.getElementById('zhouyi-bazi-recommendation');
+    const zhouyiShengxiaoRecommendation = document.getElementById('zhouyi-shengxiao-recommendation');
+    const baziZhouyiRecommendation = document.getElementById('bazi-zhouyi-recommendation');
+    const shengxiaoLuohouRecommendation = document.getElementById('shengxiao-luohou-recommendation');
+    const recommendBaziBtn = document.getElementById('recommend-bazi-btn');
+    const recommendShengxiaoBtn = document.getElementById('recommend-shengxiao-btn');
+    const recommendZhouyiBtn = document.getElementById('recommend-zhouyi-btn');
+    const recommendLuohouBtn = document.getElementById('recommend-luohou-btn');
+    const relationshipQuestionPattern = /感情|婚姻|对象|合作|合伙|伴侣|朋友|同事/;
 
     // 存储当前问题的状态，用于第二次发请求
     let currentHexagramNumber = null;
@@ -41,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 视图切换辅助函数
     function showSection(section) {
-        container.classList.toggle('wide-layout', section === luohouSection);
+        container.classList.toggle('wide-layout', section === luohouSection || section === yarrowSection);
         homeSection.classList.remove('active');
         homeSection.classList.add('hidden');
         questionSection.classList.remove('active');
@@ -67,6 +79,105 @@ document.addEventListener('DOMContentLoaded', () => {
                 section.classList.add('active');
             });
         }, 10);
+    }
+
+    function setFormMessage(target, message, state = 'error') {
+        if (!target) return;
+        target.textContent = message;
+        target.dataset.state = state;
+    }
+
+    function clearFormMessage(target) {
+        if (!target) return;
+        target.textContent = '';
+        delete target.dataset.state;
+    }
+
+    function cleanResultLines(output) {
+        return String(output || '')
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line && !/^[-=]{3,}$/.test(line));
+    }
+
+    function pickLines(lines, pattern, fallbackCount) {
+        const picked = lines.filter(line => pattern.test(line));
+        return (picked.length ? picked : lines).slice(0, fallbackCount);
+    }
+
+    function appendResultCard(container, title, lines) {
+        const card = document.createElement('article');
+        card.className = 'result-card';
+
+        const titleEl = document.createElement('strong');
+        titleEl.className = 'result-card-title';
+        titleEl.textContent = title;
+        card.appendChild(titleEl);
+
+        const bodyLines = Array.isArray(lines) ? lines.filter(Boolean) : [lines].filter(Boolean);
+        if (bodyLines.length > 1) {
+            const list = document.createElement('ul');
+            list.className = 'result-card-list';
+            bodyLines.forEach(line => {
+                const item = document.createElement('li');
+                item.textContent = line;
+                list.appendChild(item);
+            });
+            card.appendChild(list);
+        } else {
+            const copy = document.createElement('p');
+            copy.className = 'result-card-copy';
+            copy.textContent = bodyLines[0] || '暂无结果';
+            card.appendChild(copy);
+        }
+
+        container.appendChild(card);
+    }
+
+    function renderStructuredResult(container, output, type) {
+        if (!container) return;
+        container.innerHTML = '';
+
+        const lines = cleanResultLines(output);
+        if (!lines.length) {
+            appendResultCard(container, '当前状态', '暂无可展示的结果');
+            return;
+        }
+
+        if (type === 'shengxiao') {
+            appendResultCard(container, '你的信息', pickLines(lines, /你的生肖|你的年支/, 3));
+            appendResultCard(container, '相合关系', pickLines(lines, /三合|六合|相合|合的生肖/, 4));
+            appendResultCard(container, '需要留意', pickLines(lines, /不合|六冲|相冲|相刑|相害|相破|冲|刑|害|破/, 5));
+            return;
+        }
+
+        if (type === 'luohou') {
+            appendResultCard(container, '重点日期', pickLines(lines, /公历|农历|罗喉|日时|杀|月破|岁破/, 6));
+            appendResultCard(container, '择日参考', pickLines(lines, /宜|忌|九宫|飞星|白水星|黑土星|碧木星|黄土星|白金星|赤金星/, 6));
+            appendResultCard(container, '下一步建议', '先避开明显不利的日时，再结合现实安排选择最稳妥的时间窗口。');
+            return;
+        }
+
+        appendResultCard(container, '核心信息', pickLines(lines, /命|四柱|八字|年柱|月柱|日柱|时柱|五行|大运/, 6));
+        appendResultCard(container, '详细信息', lines.slice(0, 12));
+        appendResultCard(container, '下一步建议', '先看大方向，再用下面的大白话解读把复杂术语翻译成容易理解的判断。');
+    }
+
+    function openZhouyiSection() {
+        clearFormMessage(zhouyiMessage);
+        divineBtn.disabled = false;
+        showSection(questionSection);
+        setTimeout(() => questionInput.focus(), 80);
+    }
+
+    function hideZhouyiRecommendations() {
+        zhouyiBaziRecommendation.style.display = 'none';
+        zhouyiShengxiaoRecommendation.style.display = 'none';
+    }
+
+    function updateZhouyiRecommendations() {
+        zhouyiBaziRecommendation.style.display = 'block';
+        zhouyiShengxiaoRecommendation.style.display = relationshipQuestionPattern.test(currentQuestion) ? 'block' : 'none';
     }
 
     // 绘制爻线（0为阴，1为阳），动爻位置高亮
@@ -106,14 +217,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function startDivination() {
         const question = questionInput.value.trim();
         if (!question) {
-            alert('请先输入您想要占卜的具体事情');
+            setFormMessage(zhouyiMessage, '请先写下你想问的具体事情，或点一个示例问题。');
             questionInput.focus();
             return;
         }
 
         // 切换到动画视图
+        clearFormMessage(zhouyiMessage);
         showSection(animationSection);
         divineBtn.disabled = true;
+        hideZhouyiRecommendations();
 
         // 模拟占卜过程（让用户感受仪式感，延迟2秒）
         setTimeout(async () => {
@@ -169,10 +282,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 此时还未解卦，显示解卦按钮，隐藏解析内容
                 interpretBtn.style.display = 'block';
                 interpWrapper.style.display = 'none';
+                hideZhouyiRecommendations();
 
             } catch (error) {
                 console.error('Fetch 错误:', error);
-                alert('服务异常，请稍后再试。' + error.message);
+                setFormMessage(zhouyiMessage, `服务异常，请稍后再试。${error.message}`);
                 showSection(questionSection);
                 divineBtn.disabled = false;
             }
@@ -190,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (interpContentModern) {
             interpContentModern.innerHTML = '<span class="cursor hidden" id="typer-cursor-modern"></span>';
         }
+        hideZhouyiRecommendations();
                 
         let currentText = '';
         let isModern = false;
@@ -232,46 +347,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     const dataStr = trimmed.slice(6);
                     if (dataStr === '[DONE]') continue;
 
+                    let data;
                     try {
-                        const data = JSON.parse(dataStr);
-                            
-                        if (data.type === 'content') {
-                            currentText += data.text;
-                            
-                            // 容错正则：匹配 [大白话] 或 ===大白话=== 及其各种变体
-                            const splitRegex = /\s*(?:={2,}\s*大白话\s*={2,}|\[大白话\])\s*/;
-                            if (!isModern && splitRegex.test(currentText)) {
-                                isModern = true;
-                                const parts = currentText.split(splitRegex);
-                                // 锁定古文部分并隐藏光标
-                                if (parts[0]) {
-                                    interpContent.innerHTML = parts[0].trim().replace(/\n/g, '<br>');
-                                }
-                                const cursor1 = document.getElementById('typer-cursor');
-                                if(cursor1) cursor1.classList.add('hidden');
-                                    
-                                // 显示白话部分光标
-                                const cursor2 = document.getElementById('typer-cursor-modern');
-                                if(cursor2) cursor2.classList.remove('hidden');
-                                    
-                                currentText = (parts[1] || '').trim();
-                            }
-
-                            if (!isModern) {
-                                interpContent.innerHTML = currentText.replace(/\n/g, '<br>') + '<span class="cursor" id="typer-cursor"></span>';
-                                interpContent.scrollTop = interpContent.scrollHeight;
-                            } else {
-                                interpContentModern.innerHTML = currentText.replace(/\n/g, '<br>') + '<span class="cursor" id="typer-cursor-modern"></span>';
-                                interpContentModern.scrollTop = interpContentModern.scrollHeight;
-                            }
-                        }
-                        // 处理服务端抛出的错误指令
-                        else if (data.type === 'error') {
-                            alert('解卦出错：' + data.message);
-                            return;
-                        }
+                        data = JSON.parse(dataStr);
                     } catch (e) {
                         console.error('JSON解析错误', e, dataStr);
+                        continue;
+                    }
+
+                    if (data.type === 'content') {
+                        currentText += data.text;
+
+                        // 容错正则：匹配 [大白话] 或 ===大白话=== 及其各种变体
+                        const splitRegex = /\s*(?:={2,}\s*大白话\s*={2,}|\[大白话\])\s*/;
+                        if (!isModern && splitRegex.test(currentText)) {
+                            isModern = true;
+                            const parts = currentText.split(splitRegex);
+                            // 锁定古文部分并隐藏光标
+                            if (parts[0]) {
+                                interpContent.innerHTML = parts[0].trim().replace(/\n/g, '<br>');
+                            }
+                            const cursor1 = document.getElementById('typer-cursor');
+                            if(cursor1) cursor1.classList.add('hidden');
+
+                            // 显示白话部分光标
+                            const cursor2 = document.getElementById('typer-cursor-modern');
+                            if(cursor2) cursor2.classList.remove('hidden');
+
+                            currentText = (parts[1] || '').trim();
+                        }
+
+                        if (!isModern) {
+                            interpContent.innerHTML = currentText.replace(/\n/g, '<br>') + '<span class="cursor" id="typer-cursor"></span>';
+                            interpContent.scrollTop = interpContent.scrollHeight;
+                        } else {
+                            interpContentModern.innerHTML = currentText.replace(/\n/g, '<br>') + '<span class="cursor" id="typer-cursor-modern"></span>';
+                            interpContentModern.scrollTop = interpContentModern.scrollHeight;
+                        }
+                    } else if (data.type === 'error') {
+                        throw new Error(data.message);
                     }
                 }
             }
@@ -281,17 +395,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if(cursor) cursor.classList.add('hidden');
             const cursorMod = document.getElementById('typer-cursor-modern');
             if(cursorMod) cursorMod.classList.add('hidden');
+            updateZhouyiRecommendations();
 
         } catch (error) {
             console.error('Fetch 错误:', error);
-            alert('服务异常，请稍后再试。' + error.message);
+            interpContent.textContent = `服务异常，请稍后再试。${error.message}`;
             interpretBtn.style.display = 'block'; // 让用户可以重试
-            interpWrapper.style.display = 'none';
+            interpWrapper.style.display = 'block';
         }
     }
 
     // 绑定事件
-    zhouyiEntryBtn.addEventListener('click', () => showSection(questionSection));
+    zhouyiEntryBtn.addEventListener('click', openZhouyiSection);
     divineBtn.addEventListener('click', startDivination);
     interpretBtn.addEventListener('click', startInterpretation);
     zhouyiBackBtn.addEventListener('click', () => showSection(homeSection));
@@ -301,6 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showSection(questionSection);
         divineBtn.disabled = false;
     });
+    resultHomeBtn.addEventListener('click', () => showSection(homeSection));
 
     // ============ 八字排盘 ============
     const baziBackBtn = document.getElementById('bazi-back-btn');
@@ -312,8 +428,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const baziDay = document.getElementById('bazi-day');
     const baziHour = document.getElementById('bazi-hour');
     const baziLeapMonth = document.getElementById('bazi-leap-month');
+    const baziMessage = document.getElementById('bazi-message');
     const baziResultWrapper = document.getElementById('bazi-result-wrapper');
     const baziResultTitle = document.getElementById('bazi-result-title');
+    const baziResultCards = document.getElementById('bazi-result-cards');
     const baziResult = document.getElementById('bazi-result');
     const baziInterpretBtn = document.getElementById('bazi-interpret-btn');
     const baziInterpretWrapper = document.getElementById('bazi-interpret-wrapper');
@@ -333,6 +451,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isLunar) baziLeapMonth.checked = false;
     }
 
+    function openBaziSection() {
+        updateLeapMonthState();
+        clearFormMessage(baziMessage);
+        showSection(baziSection);
+    }
+
     function readBaziPayload() {
         return {
             calendar: baziCalendar.value,
@@ -348,18 +472,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function startBaziReading() {
         const payload = readBaziPayload();
         if (!payload.year || !payload.month || !payload.day || payload.hour === '') {
-            alert('请把出生年月日时填写完整');
+            setFormMessage(baziMessage, '请把出生年月日时填写完整。');
             return;
         }
 
+        clearFormMessage(baziMessage);
         const originalText = baziSubmitBtn.textContent;
         baziSubmitBtn.disabled = true;
         baziSubmitBtn.textContent = '排盘中...';
         baziResultWrapper.style.display = 'block';
         baziResultTitle.textContent = '排盘结果';
+        renderStructuredResult(baziResultCards, '正在推演四柱，请稍候...', 'bazi');
         baziResult.textContent = '正在推演四柱，请稍候...';
         baziInterpretBtn.style.display = 'none';
         baziInterpretWrapper.style.display = 'none';
+        baziZhouyiRecommendation.style.display = 'none';
         baziInterpretContent.innerHTML = '<span class="cursor" id="bazi-typer-cursor"></span>';
         currentBaziOutput = '';
 
@@ -376,10 +503,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             currentBaziOutput = data.output || '';
+            renderStructuredResult(baziResultCards, currentBaziOutput || '排盘完成，但脚本没有返回内容', 'bazi');
             baziResult.textContent = currentBaziOutput || '排盘完成，但脚本没有返回内容';
             baziInterpretBtn.style.display = currentBaziOutput ? 'block' : 'none';
         } catch (error) {
+            renderStructuredResult(baziResultCards, error.message, 'bazi');
             baziResult.textContent = error.message;
+            setFormMessage(baziMessage, error.message);
         } finally {
             baziSubmitBtn.disabled = false;
             baziSubmitBtn.textContent = originalText;
@@ -400,18 +530,21 @@ document.addEventListener('DOMContentLoaded', () => {
     async function startBaziReverseReading() {
         const payload = readBaziReversePayload();
         if (!payload.yearPillar || !payload.monthPillar || !payload.dayPillar || !payload.hourPillar) {
-            alert('请把年柱、月柱、日柱、时柱填写完整');
+            setFormMessage(baziMessage, '请把年柱、月柱、日柱、时柱填写完整。');
             return;
         }
 
+        clearFormMessage(baziMessage);
         const originalText = baziReverseSubmitBtn.textContent;
         baziReverseSubmitBtn.disabled = true;
         baziReverseSubmitBtn.textContent = '反推中...';
         baziResultWrapper.style.display = 'block';
         baziResultTitle.textContent = '反推结果';
+        renderStructuredResult(baziResultCards, '正在反推可能出生时间，请稍候...', 'bazi');
         baziResult.textContent = '正在反推可能出生时间，请稍候...';
         baziInterpretBtn.style.display = 'none';
         baziInterpretWrapper.style.display = 'none';
+        baziZhouyiRecommendation.style.display = 'none';
         baziInterpretContent.innerHTML = '<span class="cursor" id="bazi-typer-cursor"></span>';
         currentBaziOutput = '';
 
@@ -427,9 +560,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || '四柱反推失败');
             }
 
-            baziResult.textContent = data.output || '反推完成，但脚本没有返回内容';
+            const reverseOutput = data.output || '反推完成，但脚本没有返回内容';
+            renderStructuredResult(baziResultCards, reverseOutput, 'bazi');
+            baziResult.textContent = reverseOutput;
         } catch (error) {
+            renderStructuredResult(baziResultCards, error.message, 'bazi');
             baziResult.textContent = error.message;
+            setFormMessage(baziMessage, error.message);
         } finally {
             baziReverseSubmitBtn.disabled = false;
             baziReverseSubmitBtn.textContent = originalText;
@@ -438,13 +575,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function startBaziInterpretation() {
         if (!currentBaziOutput) {
-            alert('请先完成八字排盘');
+            setFormMessage(baziMessage, '请先完成八字排盘。');
             return;
         }
 
+        clearFormMessage(baziMessage);
         baziInterpretBtn.disabled = true;
         baziInterpretBtn.textContent = '解读中...';
         baziInterpretWrapper.style.display = 'block';
+        baziZhouyiRecommendation.style.display = 'none';
         baziInterpretContent.innerHTML = '<span class="cursor" id="bazi-typer-cursor"></span>';
 
         let currentText = '';
@@ -508,6 +647,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderBaziInterpretation(currentText, false);
             const cursor = document.getElementById('bazi-typer-cursor');
             if (cursor) cursor.classList.add('hidden');
+            baziZhouyiRecommendation.style.display = 'block';
         } catch (error) {
             baziInterpretContent.textContent = error.message || '八字解读失败，请稍后再试';
         } finally {
@@ -517,8 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     baziEntryBtn.addEventListener('click', () => {
-        updateLeapMonthState();
-        showSection(baziSection);
+        openBaziSection();
     });
     baziBackBtn.addEventListener('click', () => showSection(homeSection));
     baziSubmitBtn.addEventListener('click', startBaziReading);
@@ -530,15 +669,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const shengxiaoSelect = document.getElementById('shengxiao-select');
     const shengxiaoSubmitBtn = document.getElementById('shengxiao-submit-btn');
     const shengxiaoBackBtn = document.getElementById('shengxiao-back-btn');
+    const shengxiaoMessage = document.getElementById('shengxiao-message');
     const shengxiaoResultWrapper = document.getElementById('shengxiao-result-wrapper');
+    const shengxiaoResultCards = document.getElementById('shengxiao-result-cards');
     const shengxiaoResult = document.getElementById('shengxiao-result');
 
     async function startShengxiaoReading() {
+        clearFormMessage(shengxiaoMessage);
         const originalText = shengxiaoSubmitBtn.textContent;
         shengxiaoSubmitBtn.disabled = true;
         shengxiaoSubmitBtn.textContent = '查询中...';
         shengxiaoResultWrapper.style.display = 'block';
+        renderStructuredResult(shengxiaoResultCards, '正在查合冲刑害关系...', 'shengxiao');
         shengxiaoResult.textContent = '正在查合冲刑害关系...';
+        shengxiaoLuohouRecommendation.style.display = 'none';
 
         try {
             const response = await fetch('/api/shengxiao', {
@@ -552,16 +696,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error || '生肖合婚查询失败');
             }
 
-            shengxiaoResult.textContent = data.output || '查询完成，但脚本没有返回内容';
+            const shengxiaoOutput = data.output || '查询完成，但脚本没有返回内容';
+            renderStructuredResult(shengxiaoResultCards, shengxiaoOutput, 'shengxiao');
+            shengxiaoResult.textContent = shengxiaoOutput;
+            shengxiaoLuohouRecommendation.style.display = data.output ? 'block' : 'none';
         } catch (error) {
+            renderStructuredResult(shengxiaoResultCards, error.message, 'shengxiao');
             shengxiaoResult.textContent = error.message;
+            setFormMessage(shengxiaoMessage, error.message);
+            shengxiaoLuohouRecommendation.style.display = 'none';
         } finally {
             shengxiaoSubmitBtn.disabled = false;
             shengxiaoSubmitBtn.textContent = originalText;
         }
     }
 
-    shengxiaoEntryBtn.addEventListener('click', () => showSection(shengxiaoSection));
+    shengxiaoEntryBtn.addEventListener('click', () => {
+        clearFormMessage(shengxiaoMessage);
+        showSection(shengxiaoSection);
+    });
     shengxiaoBackBtn.addEventListener('click', () => showSection(homeSection));
     shengxiaoSubmitBtn.addEventListener('click', startShengxiaoReading);
 
@@ -569,8 +722,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const luohouDate = document.getElementById('luohou-date');
     const luohouDays = document.getElementById('luohou-days');
     const luohouSubmitBtn = document.getElementById('luohou-submit-btn');
+    const luohouSingleDayBtn = document.getElementById('luohou-single-day-btn');
     const luohouBackBtn = document.getElementById('luohou-back-btn');
+    const luohouMessage = document.getElementById('luohou-message');
     const luohouResultWrapper = document.getElementById('luohou-result-wrapper');
+    const luohouResultCards = document.getElementById('luohou-result-cards');
     const luohouResult = document.getElementById('luohou-result');
     const luohouInterpretBtn = document.getElementById('luohou-interpret-btn');
     const luohouInterpretWrapper = document.getElementById('luohou-interpret-wrapper');
@@ -593,12 +749,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function startLuohouReading() {
+    function openLuohouSection() {
         ensureLuohouDefaults();
+        clearFormMessage(luohouMessage);
+        showSection(luohouSection);
+    }
+
+    async function startLuohouReading(daysOverride) {
+        ensureLuohouDefaults();
+        const queryDays = daysOverride || luohouDays.value;
+        clearFormMessage(luohouMessage);
         const originalText = luohouSubmitBtn.textContent;
+        const originalSingleText = luohouSingleDayBtn.textContent;
         luohouSubmitBtn.disabled = true;
+        luohouSingleDayBtn.disabled = true;
         luohouSubmitBtn.textContent = '查询中...';
+        if (daysOverride === 1) {
+            luohouSingleDayBtn.textContent = '查询中...';
+        }
         luohouResultWrapper.style.display = 'block';
+        renderStructuredResult(luohouResultCards, '正在查罗喉日时与择日辅助...', 'luohou');
         luohouResult.textContent = '正在查罗喉日时与择日辅助...';
         luohouInterpretBtn.style.display = 'none';
         luohouInterpretWrapper.style.display = 'none';
@@ -611,7 +781,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     date: luohouDate.value,
-                    days: luohouDays.value
+                    days: queryDays
                 })
             });
 
@@ -621,22 +791,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             currentLuohouOutput = data.output || '';
+            renderStructuredResult(luohouResultCards, currentLuohouOutput || '查询完成，但脚本没有返回内容', 'luohou');
             luohouResult.textContent = currentLuohouOutput || '查询完成，但脚本没有返回内容';
             luohouInterpretBtn.style.display = currentLuohouOutput ? 'block' : 'none';
         } catch (error) {
+            renderStructuredResult(luohouResultCards, error.message, 'luohou');
             luohouResult.textContent = error.message;
+            setFormMessage(luohouMessage, error.message);
         } finally {
             luohouSubmitBtn.disabled = false;
+            luohouSingleDayBtn.disabled = false;
             luohouSubmitBtn.textContent = originalText;
+            luohouSingleDayBtn.textContent = originalSingleText;
         }
+    }
+
+    function startLuohouSingleDayReading() {
+        luohouDays.value = '1';
+        return startLuohouReading(1);
     }
 
     async function startLuohouInterpretation() {
         if (!currentLuohouOutput) {
-            alert('请先完成罗喉择日');
+            setFormMessage(luohouMessage, '请先完成罗喉择日。');
             return;
         }
 
+        clearFormMessage(luohouMessage);
         luohouInterpretBtn.disabled = true;
         luohouInterpretBtn.textContent = '解读中...';
         luohouInterpretWrapper.style.display = 'block';
@@ -710,17 +891,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     luohouEntryBtn.addEventListener('click', () => {
-        ensureLuohouDefaults();
-        showSection(luohouSection);
+        openLuohouSection();
     });
     luohouBackBtn.addEventListener('click', () => showSection(homeSection));
     luohouSubmitBtn.addEventListener('click', startLuohouReading);
+    luohouSingleDayBtn.addEventListener('click', startLuohouSingleDayReading);
     luohouInterpretBtn.addEventListener('click', startLuohouInterpretation);
+    recommendBaziBtn.addEventListener('click', openBaziSection);
+    recommendShengxiaoBtn.addEventListener('click', () => showSection(shengxiaoSection));
+    recommendZhouyiBtn.addEventListener('click', openZhouyiSection);
+    recommendLuohouBtn.addEventListener('click', openLuohouSection);
 
     questionInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             startDivination();
         }
+    });
+
+    questionTemplateBtns.forEach(button => {
+        button.addEventListener('click', () => {
+            questionInput.value = button.dataset.question || '';
+            clearFormMessage(zhouyiMessage);
+            questionInput.focus();
+        });
     });
 
     // ============ 蓍草模式 ============
@@ -744,10 +937,11 @@ document.addEventListener('DOMContentLoaded', () => {
     yarrowBtn.addEventListener('click', () => {
         const question = questionInput.value.trim();
         if (!question) {
-            alert('请先输入您想要占卜的具体事情');
+            setFormMessage(zhouyiMessage, '请先写下你想问的具体事情，或点一个示例问题。');
             questionInput.focus();
             return;
         }
+        clearFormMessage(zhouyiMessage);
         currentQuestion = question;
         showSection(yarrowSection);
 
@@ -901,7 +1095,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         interpretBtn.style.display = 'block';
                         interpWrapper.style.display = 'none';
                     } catch (error) {
-                        alert('查表失败：' + error.message);
+                        yarrowNarration.textContent = `查表失败：${error.message}`;
+                        yarrowNextBtn.style.display = 'block';
+                        yarrowNextBtn.textContent = '重新查看卦象';
                     }
                 };
             },
@@ -932,7 +1128,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shareBtn) {
         shareBtn.addEventListener('click', async () => {
             if (typeof window.html2canvas === 'undefined') {
-                alert('截图插件尚未加载完成，请稍后再试。');
+                shareBtn.textContent = '截图插件未就绪';
+                setTimeout(() => {
+                    shareBtn.textContent = '保存分享图';
+                }, 1600);
                 return;
             }
             
@@ -974,11 +1173,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error('截图失败', err);
-                alert('截图生成失败，请稍后重试。');
                 targetEl.classList.remove('share-mode');
                 actionsEl.classList.remove('share-hide');
-                shareBtn.textContent = originalText;
+                shareBtn.textContent = '截图失败，请重试';
                 shareBtn.disabled = false;
+                setTimeout(() => {
+                    shareBtn.textContent = originalText;
+                }, 1800);
             }
         });
     }

@@ -3,7 +3,7 @@
  * 
  * 核心职责：
  * 1. 启动时加载64卦 Markdown 知识库到内存
- * 2. 提供 POST /api/divine 接口：接收用户问题，模拟起卦，调用通义千问 AI 流式解读
+ * 2. 提供 POST /api/divine 接口：接收用户问题，模拟起卦，调用 Qwen AI 流式解读
  * 3. 提供静态文件服务（public 目录）
  */
 
@@ -13,6 +13,8 @@ const path = require('path');
 const { buildBaziInterpretationMessages, runBaziReading, runBaziReverseReading } = require('./lib/bazi-service');
 const { buildLuohouInterpretationMessages, runLuohouReading } = require('./lib/luohou-service');
 const { runShengxiaoReading } = require('./lib/shengxiao-service');
+const { streamQwenResponse } = require('./lib/ai-stream-service');
+const { createApiRateLimiter } = require('./lib/http-middleware');
 require('dotenv').config();
 
 // 如果还没安装 sqlite3，可能需要用户执行下 npm install sqlite3
@@ -40,12 +42,15 @@ try {
   });
 } catch (e) {
   console.warn('⚠️ 未侦测到 sqlite3 模块。如需持久化记录请在终端执行 npm install sqlite3，并重启服务。');
-  // 创建一个 dummy object 防止 db.run 报错
-  db = { run: () => {} };
+  db = null;
 }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const apiRateLimiter = createApiRateLimiter({
+  windowMs: Number(process.env.API_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.API_RATE_LIMIT_MAX) || 100,
+});
 
 // ============ 知识库加载 ============
 
@@ -187,6 +192,7 @@ function divinate() {
 // ============ API 路由 ============
 
 app.use(express.json());
+app.use('/api/', apiRateLimiter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 /**
@@ -340,7 +346,7 @@ app.post('/api/luohou', async (req, res) => {
 
 /**
  * POST /api/luohou/interpret
- * 接收罗喉择日原文，调用通义千问流式生成大白话解读
+ * 接收罗喉择日原文，调用 Qwen 流式生成大白话解读
  */
 app.post('/api/luohou/interpret', async (req, res) => {
   let messages;
@@ -350,92 +356,16 @@ app.post('/api/luohou/interpret', async (req, res) => {
     return res.status(400).json({ error: error.message || '罗喉择日内容无效' });
   }
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  try {
-    const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.DASHSCOPE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'qwen-plus',
-        messages,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('罗喉 AI 解读 API 错误:', errorText);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI 解读服务暂时不可用，请稍后再试' })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const data = trimmed.slice(6);
-        if (data === '[DONE]') {
-          res.write('data: [DONE]\n\n');
-          continue;
-        }
-
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
-          }
-        } catch (e) {
-          // 忽略上游偶发的非 JSON 分片
-        }
-      }
-    }
-
-    if (buffer.trim()) {
-      const trimmed = buffer.trim();
-      if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
-        try {
-          const parsed = JSON.parse(trimmed.slice(6));
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
-          }
-        } catch (e) {}
-      }
-    }
-
-    res.write('data: [DONE]\n\n');
-    res.end();
-  } catch (error) {
-    console.error('请求罗喉 AI 解读失败:', error);
-    res.write(`data: ${JSON.stringify({ type: 'error', message: '网络错误，请稍后再试' })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
-  }
+  await streamQwenResponse({
+    res,
+    messages,
+    errorPrefix: '罗喉 AI 解读',
+  });
 });
 
 /**
  * POST /api/bazi/interpret
- * 接收八字排盘原文，调用通义千问流式生成大白话解读
+ * 接收八字排盘原文，调用 Qwen 流式生成大白话解读
  */
 app.post('/api/bazi/interpret', async (req, res) => {
   let messages;
@@ -445,92 +375,16 @@ app.post('/api/bazi/interpret', async (req, res) => {
     return res.status(400).json({ error: error.message || '八字排盘内容无效' });
   }
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  try {
-    const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.DASHSCOPE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'qwen-plus',
-        messages,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('八字 AI 解读 API 错误:', errorText);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI 解读服务暂时不可用，请稍后再试' })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const data = trimmed.slice(6);
-        if (data === '[DONE]') {
-          res.write('data: [DONE]\n\n');
-          continue;
-        }
-
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
-          }
-        } catch (e) {
-          // 忽略上游偶发的非 JSON 分片
-        }
-      }
-    }
-
-    if (buffer.trim()) {
-      const trimmed = buffer.trim();
-      if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
-        try {
-          const parsed = JSON.parse(trimmed.slice(6));
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
-          }
-        } catch (e) {}
-      }
-    }
-
-    res.write('data: [DONE]\n\n');
-    res.end();
-  } catch (error) {
-    console.error('请求八字 AI 解读失败:', error);
-    res.write(`data: ${JSON.stringify({ type: 'error', message: '网络错误，请稍后再试' })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
-  }
+  await streamQwenResponse({
+    res,
+    messages,
+    errorPrefix: '八字 AI 解读',
+  });
 });
 
 /**
  * POST /api/interpret
- * 接收用户问题与已生成的卦象 ID，调用通义千问 AI 进行 SSE 流式解读
+ * 接收用户问题与已生成的卦象 ID，调用 Qwen AI 进行 SSE 流式解读
  */
 app.post('/api/interpret', async (req, res) => {
   const { question, hexagramNumber } = req.body;
@@ -539,11 +393,6 @@ app.post('/api/interpret', async (req, res) => {
   if (!hexagram) {
     return res.status(400).json({ error: '卦象参数或查阅有误，无法为您解读' });
   }
-
-  // 设置 SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
 
   // 构建动爻信息文本（用于 AI 提示词）
   const { changingPositions, changedHexagramNumber } = req.body;
@@ -573,107 +422,35 @@ app.post('/api/interpret', async (req, res) => {
 重要：分隔标记 [大白话] 必须独占一行，前后不能有任何其他字符。`;
 
   const userPrompt = `我想占卜的问题是：${question}\n\n我用蓍草起卦法得到的卦象是：\n\n${hexagram.content}${changingInfo}\n\n请根据以上卦象和我的问题进行解读。`;
+  let fullAiResponse = '';
 
-  try {
-    // 调用通义千问 DashScope API（OpenAI 兼容模式）
-    const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.DASHSCOPE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'qwen-plus',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        stream: true,
-      }),
-    });
+  const streamResult = await streamQwenResponse({
+    res,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    errorPrefix: 'AI',
+    onContent: (content) => {
+      fullAiResponse += content;
+    },
+    onUsage: (usage) => {
+      if (!usage.total_tokens) return;
+      const logLine = `[${new Date().toISOString()}] Question: ${question.replace(/\n/g, ' ').substring(0, 30)} | Input: ${usage.prompt_tokens} | Output: ${usage.completion_tokens} | Total: ${usage.total_tokens}\n`;
+      fs.appendFileSync(path.join(__dirname, 'token_usage.log'), logLine);
+    },
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI API 错误:', errorText);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI 解读服务暂时不可用，请稍后再试' })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
-      return;
-    }
-
-    // 流式读取 AI 响应
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullAiResponse = ''; // 新增：用于在后台拦截拼接模型给出的完整解语
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop(); // 保留未完整的行
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const data = trimmed.slice(6);
-        if (data === '[DONE]') {
-          res.write('data: [DONE]\n\n');
-          continue;
+  if (streamResult.ok) {
+    if (db) {
+      db.run(
+        `INSERT INTO divination_history (question, hexagram_number, changing_positions, changed_hexagram, ai_interpretation) VALUES (?, ?, ?, ?, ?)`,
+        [question, hexagramNumber, JSON.stringify(changingPositions || []), changedHexagramNumber, fullAiResponse],
+        (err) => {
+          if (err) console.error('保存占卜记录失败:', err.message);
         }
-
-        try {
-          const parsed = JSON.parse(data);
-          
-          if (parsed.usage && parsed.usage.total_tokens) {
-            const logLine = `[${new Date().toISOString()}] Question: ${question.replace(/\\n/g, ' ').substring(0, 30)} | Input: ${parsed.usage.prompt_tokens} | Output: ${parsed.usage.completion_tokens} | Total: ${parsed.usage.total_tokens}\n`;
-            fs.appendFileSync(path.join(__dirname, 'token_usage.log'), logLine);
-          }
-
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            fullAiResponse += content;
-            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
-          }
-        } catch (e) {
-          // 忽略解析错误
-        }
-      }
+      );
     }
-
-    // 处理 buffer 中可能剩余的数据
-    if (buffer.trim()) {
-      const trimmed = buffer.trim();
-      if (trimmed.startsWith('data: ') && trimmed.slice(6) !== '[DONE]') {
-        try {
-          const parsed = JSON.parse(trimmed.slice(6));
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            fullAiResponse += content;
-            res.write(`data: ${JSON.stringify({ type: 'content', text: content })}\n\n`);
-          }
-        } catch (e) {}
-      }
-    }
-
-    // 所有的流已经读取且拼接完毕，存入 SQLite
-    db.run(
-      `INSERT INTO divination_history (question, hexagram_number, changing_positions, changed_hexagram, ai_interpretation) VALUES (?, ?, ?, ?, ?)`,
-      [question, hexagramNumber, JSON.stringify(changingPositions || []), changedHexagramNumber, fullAiResponse],
-      (err) => {
-        if (err) console.error('保存占卜记录失败:', err.message);
-      }
-    );
-
-    res.write('data: [DONE]\n\n');
-    res.end();
-  } catch (error) {
-    console.error('请求 AI 失败:', error);
-    res.write(`data: ${JSON.stringify({ type: 'error', message: '网络错误，请稍后再试' })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
   }
 });
 

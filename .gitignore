@@ -4,3 +4,4 @@ node_modules
 database.sqlite
 npm-debug.log
 .vitepress/cache
+token_usage.log

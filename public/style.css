@@ -81,7 +81,7 @@ h1 {
 .home-section {
   display: none;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.2rem;
   opacity: 0;
   transition: opacity 0.5s ease;
 }
@@ -91,14 +91,82 @@ h1 {
   opacity: 1;
 }
 
+.hero-panel {
+  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 3.2rem 2rem;
+  background-color: var(--panel-bg);
+  border: 1px solid rgba(192, 160, 98, 0.55);
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5);
+}
+
+.hero-kicker {
+  color: var(--accent-gold);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.hero-title {
+  margin-top: 0.7rem;
+  color: var(--accent-gold);
+  font-size: 2.15rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.hero-copy {
+  max-width: 30rem;
+  margin-top: 1rem;
+  color: var(--text-primary);
+  font-size: 1.08rem;
+  line-height: 1.8;
+}
+
+.hero-actions {
+  display: flex;
+  width: 100%;
+  max-width: 220px;
+  gap: 0.8rem;
+  justify-content: center;
+  margin-top: 1.6rem;
+}
+
+.hero-actions button {
+  width: 100%;
+  letter-spacing: 0;
+}
+
+.hero-primary-btn {
+  box-shadow: 0 8px 20px rgba(139, 44, 36, 0.35);
+}
+
+.hero-fit-list {
+  margin-top: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.home-subgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
 .home-entry {
   display: flex;
-  min-height: 170px;
+  min-height: 150px;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   gap: 0.5rem;
-  padding: 1.6rem;
+  padding: 1.25rem;
   background-color: var(--panel-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -108,14 +176,10 @@ h1 {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
 }
 
-.home-entry:hover {
+button.home-entry:hover {
   border-color: var(--accent-gold);
   transform: translateY(-2px);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
-}
-
-.home-entry-primary {
-  border-color: rgba(192, 160, 98, 0.7);
 }
 
 .home-entry-kicker {
@@ -126,17 +190,43 @@ h1 {
 
 .home-entry-title {
   color: var(--accent-gold);
-  font-size: 1.7rem;
+  font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.25;
 }
 
 .home-entry-copy {
-  max-width: 29rem;
   color: var(--text-secondary);
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 400;
-  line-height: 1.7;
+  line-height: 1.65;
+}
+
+.method-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  padding: 1.1rem 0 0.2rem;
+}
+
+.method-item {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.85rem;
+}
+
+.method-title {
+  display: block;
+  color: var(--accent-gold);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.method-copy {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 /* Form Styles */
@@ -190,6 +280,64 @@ input[type="text"]:focus,
 select:focus {
   outline: none;
   border-color: var(--accent-gold);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 3px solid rgba(192, 160, 98, 0.55);
+  outline-offset: 3px;
+}
+
+.question-templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.question-template-btn {
+  width: auto;
+  min-height: 44px;
+  padding: 0.55rem 0.85rem;
+  background-color: rgba(192, 160, 98, 0.06);
+  border: 1px solid rgba(192, 160, 98, 0.35);
+  border-radius: 6px;
+  color: var(--accent-gold);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.question-template-btn:hover {
+  background-color: rgba(192, 160, 98, 0.12);
+  border-color: var(--accent-gold);
+  transform: none;
+}
+
+.form-message {
+  display: none;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.form-message[data-state="error"] {
+  display: block;
+  background-color: rgba(232, 85, 58, 0.12);
+  border: 1px solid rgba(232, 85, 58, 0.4);
+  color: #E8A63A;
+}
+
+.form-message[data-state="info"] {
+  display: block;
+  background-color: rgba(192, 160, 98, 0.08);
+  border: 1px solid rgba(192, 160, 98, 0.35);
+  color: var(--text-primary);
 }
 
 select option {
@@ -298,6 +446,10 @@ button {
   margin-top: 0;
 }
 
+.luohou-single-day-btn {
+  margin-top: 0.8rem;
+}
+
 .luohou-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
@@ -347,7 +499,78 @@ button {
   line-height: 1.7;
 }
 
+.structured-result-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.result-card {
+  padding: 1rem;
+  background-color: rgba(15, 18, 20, 0.48);
+  border: 1px solid rgba(192, 160, 98, 0.22);
+  border-radius: 8px;
+}
+
+.result-card-title {
+  display: block;
+  color: var(--accent-gold);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.result-card-copy {
+  margin-top: 0.45rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.result-card-list {
+  margin-top: 0.55rem;
+  padding-left: 1.1rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+.raw-result-details {
+  margin-top: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.raw-result-details summary {
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--accent-gold);
+  font-size: 0.95rem;
+  line-height: 44px;
+}
+
+.raw-result-details .bazi-result {
+  margin-top: 0.5rem;
+}
+
 @media (max-width: 560px) {
+  .container {
+    max-width: 100%;
+  }
+
+  .hero-panel {
+    min-height: 350px;
+    padding: 2.3rem 1.2rem;
+  }
+
+  .hero-title {
+    font-size: 1.8rem;
+  }
+
+  .home-subgrid,
+  .method-summary {
+    grid-template-columns: 1fr;
+  }
+
   .bazi-grid {
     grid-template-columns: 1fr;
   }
@@ -485,6 +708,50 @@ button {
   min-height: 150px;
 }
 
+.flow-recommendation {
+  margin-top: 1.2rem;
+  padding: 1.1rem 1.2rem;
+  background-color: rgba(15, 18, 20, 0.38);
+  border: 1px solid rgba(192, 160, 98, 0.45);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: 8px;
+}
+
+.flow-recommendation h3 {
+  color: var(--accent-gold);
+  font-size: 1.05rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.flow-recommendation p {
+  margin-top: 0.6rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+.flow-recommendation-btn {
+  width: auto;
+  min-width: 0;
+  margin-top: 0.9rem;
+  padding: 0.55rem 0.95rem;
+  background-color: transparent;
+  border: 1px solid rgba(192, 160, 98, 0.65);
+  border-radius: 6px;
+  box-shadow: none;
+  color: var(--accent-gold);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.flow-recommendation-btn:hover {
+  background-color: rgba(192, 160, 98, 0.08);
+  border-color: var(--accent-gold);
+}
+
 /* Custom cursor for typing effect */
 .cursor {
   display: inline-block;
@@ -585,6 +852,11 @@ button {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1.5rem; /* 控制两个按钮的间距 */
+  flex-wrap: wrap;
+  gap: 1rem; /* 控制按钮的间距 */
   margin-top: 0; /* secondary-btn 自带 2rem margin-top，这里不需要再加 */
+}
+
+.footer-actions .secondary-btn {
+  flex: 1 1 160px;
 }
