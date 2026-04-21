@@ -7,6 +7,12 @@
 (function () {
   'use strict';
 
+  function vibrateFeedback(pattern) {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(pattern);
+    }
+  }
+
   // ============ 草棍对象 ============
   class Stalk {
     constructor(x, y, angle) {
@@ -258,6 +264,7 @@
       const total = activeIndices.length;
 
       this.ui.onProgress(this.currentYao, this.currentChange, '分二');
+      vibrateFeedback(50);
       if (!this.skipMode) this.ui.onNarration('分而为二以象两仪...');
 
       const leftCount = Math.floor(Math.random() * (total - 2)) + 1;
@@ -268,6 +275,7 @@
 
       this._wait(1000, () => {
         this.ui.onProgress(this.currentYao, this.currentChange, '挂一');
+        vibrateFeedback(50);
         if (!this.skipMode) this.ui.onNarration('挂一以象三才...');
         const hungIdx = rightIndices[0];
         if (!this.skipMode) this.canvas.hangOne(hungIdx);
@@ -368,6 +376,7 @@
       const isChanging = (finalValue === 6 || finalValue === 9);
 
       this.ui.onYaoResult(this.currentYao, `${yaoNames[this.currentYao]}爻：${typeNames[finalValue]}`, isChanging);
+      vibrateFeedback(isChanging ? [70, 40, 70] : 50);
       if (!this.skipMode) this.ui.onNarration(`${yaoNames[this.currentYao]}爻定矣 — ${typeNames[finalValue]}`);
 
       this.currentYao++;
@@ -456,6 +465,7 @@
         this.completed = true;
         this.btn.classList.remove('holding');
         this.btn.classList.add('completed');
+        vibrateFeedback([100, 50, 100]);
         this.onComplete();
         return;
       }

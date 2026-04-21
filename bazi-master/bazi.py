@@ -126,6 +126,11 @@ parser.add_argument('year', action="store", help=u'year')
 parser.add_argument('month', action="store", help=u'month')
 parser.add_argument('day', action="store", help=u'day')
 parser.add_argument('time', action="store",help=u'time')    
+parser.add_argument("--minute", help="birth minute", type=int, default=0)
+parser.add_argument("--birth-place", help="birth place label", default="")
+parser.add_argument("--longitude", help="birth place longitude", type=float)
+parser.add_argument("--true-solar", action="store_true", default=False, help=u'按出生地经度换算真太阳时')
+parser.add_argument("--zi-mode", choices=("midnight", "zi-start", "warning"), default="midnight", help=u'子时换日规则')
 parser.add_argument("--start", help="start year", type=int, default=1850)
 parser.add_argument("--end", help="end year", default='2030')
 parser.add_argument('-b', action="store_true", default=False, help=u'直接输入八字')
@@ -135,6 +140,65 @@ parser.add_argument('-n', action="store_true", default=False, help=u'是否为�
 parser.add_argument('--version', action='version',
                     version='%(prog)s 1.0 Rongzhong xu 2022 06 15')
 options = parser.parse_args()
+
+if options.minute < 0 or options.minute > 59:
+    parser.error("--minute must be between 0 and 59")
+if options.true_solar and options.longitude is None:
+    parser.error("--true-solar requires --longitude")
+if options.longitude is not None and (options.longitude < -180 or options.longitude > 180):
+    parser.error("--longitude must be between -180 and 180")
+
+
+def solar_to_datetime(solar_obj):
+    return datetime.datetime.strptime(solar_obj.toYmdHms(), "%Y-%m-%d %H:%M:%S")
+
+
+def datetime_to_solar(value):
+    return Solar.fromYmdHms(value.year, value.month, value.day, value.hour, value.minute, value.second)
+
+
+def format_dt(value):
+    return value.strftime("%Y-%m-%d %H:%M")
+
+
+def apply_time_options(source_dt, options):
+    notes = []
+    reading_dt = source_dt
+
+    if options.true_solar:
+        offset_minutes = (options.longitude - 120.0) * 4
+        reading_dt = reading_dt + datetime.timedelta(minutes=offset_minutes)
+        reading_dt = reading_dt.replace(second=0, microsecond=0)
+        place = options.birth_place.strip() or "未填写出生地"
+        notes.append(
+            "排盘校时：{} 经度{:.3f}，按东八区120E换算真太阳时，校正{:+.1f}分钟，排盘用时{}。".format(
+                place,
+                options.longitude,
+                offset_minutes,
+                format_dt(reading_dt),
+            )
+        )
+
+    if options.zi_mode == "zi-start" and reading_dt.hour == 23:
+        reading_dt = (reading_dt + datetime.timedelta(days=1)).replace(hour=0)
+        notes.append("排盘提示：已按子初换日处理，23:00-23:59 归入次日子时。")
+    elif options.zi_mode == "warning" and reading_dt.hour == 23:
+        notes.append("排盘提示：出生时间在23点子初，子时换日流派不同，建议同时参考子正换日与子初换日两种结果。")
+
+    return reading_dt, notes
+
+
+def build_jieqi_notes(lunar, reading_dt):
+    candidates = []
+    for jq in (lunar.getPrevJieQi(True), lunar.getNextJieQi(True)):
+        jq_dt = solar_to_datetime(jq.getSolar())
+        hours = abs((reading_dt - jq_dt).total_seconds()) / 3600
+        candidates.append((hours, jq))
+
+    hours, jq = min(candidates, key=lambda item: item[0])
+    if hours <= 12:
+        return ["排盘提示：出生时间距离{}节气约{:.1f}小时，月柱可能对时间精度敏感。".format(str(jq), hours)]
+    return []
 
 Gans = collections.namedtuple("Gans", "year month day time")
 Zhis = collections.namedtuple("Zhis", "year month day time")
@@ -155,12 +219,16 @@ if options.b:
 else:
 
     if options.g:
-        solar = Solar.fromYmdHms(int(options.year), int(options.month), int(options.day), int(options.time), 0, 0)
-        lunar = solar.getLunar()
+        source_dt = datetime.datetime(int(options.year), int(options.month), int(options.day), int(options.time), int(options.minute), 0)
     else:
         month_ = int(options.month)*-1 if options.r else int(options.month)
-        lunar = Lunar.fromYmdHms(int(options.year), month_, int(options.day),int(options.time), 0, 0)
-        solar = lunar.getSolar()
+        source_lunar = Lunar.fromYmdHms(int(options.year), month_, int(options.day), int(options.time), int(options.minute), 0)
+        source_dt = solar_to_datetime(source_lunar.getSolar())
+
+    reading_dt, precision_notes = apply_time_options(source_dt, options)
+    solar = datetime_to_solar(reading_dt)
+    lunar = solar.getLunar()
+    precision_notes.extend(build_jieqi_notes(lunar, reading_dt))
 
     day = lunar
     ba = lunar.getEightChar() 
@@ -262,6 +330,8 @@ strong = gan_scores[me_attrs_['比']] + gan_scores[me_attrs_['劫']] \
 if not options.b:
     #print("direction",direction)
     sex = '女' if options.n else '男'
+    for note in precision_notes:
+        print(note)
     print("{}命".format(sex), end=' ')
     print("\t公历:", end=' ')
     print("{}年{}月{}日".format(solar.getYear(), solar.getMonth(), solar.getDay()), end=' ')
@@ -292,7 +362,7 @@ print('\033[1;36;40m' + ' '.join(list(gans)), ' '*5, ' '.join(list(gan_shens)) +
 
 temps_scores = temps[gans.year] + temps[gans.month] + temps[me] + temps[gans.time] + temps[zhis.year] + temps[zhis.month]*2 + temps[zhis.day] + temps[zhis.time]
 out = str(temps_scores) + " 湿度[-6,6] 拱：" + str(get_gong(zhis))
-print('\033[1;36;40m' + ' '.join(list(zhis)), ' '*5, ' '.join(list(zhi_shens)) + '\033[0m', ' '*3, out, "解读:钉ding或v信pythontesting: 四柱：" + ' '.join([''.join(item) for item in zip(gans, zhis)]),)
+print('\033[1;36;40m' + ' '.join(list(zhis)), ' '*5, ' '.join(list(zhi_shens)) + '\033[0m', ' '*3, out, "四柱：" + ' '.join([''.join(item) for item in zip(gans, zhis)]),)
 print("-"*120)
 print("{1:{0}^15s}{2:{0}^15s}{3:{0}^15s}{4:{0}^15s}".format(chr(12288), '【年】{}:{}{}{}'.format(temps[gans.year],temps[zhis.year],ten_deities[gans.year].inverse['建'], gan_zhi_he(zhus[0])), 
     '【月】{}:{}{}{}'.format(temps[gans.month],temps[zhis.month], ten_deities[gans.month].inverse['建'], gan_zhi_he(zhus[1])),

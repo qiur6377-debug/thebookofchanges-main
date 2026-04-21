@@ -1,4 +1,7 @@
 :root {
+  --ink-black: #1a1a1a;
+  --cinnabar-red: #c02c38;
+  --gold-foil: #dfc28b;
   --bg-color: #0F1214;
   --panel-bg: #1A1D20;
   --text-primary: #DCD0B1;
@@ -18,8 +21,10 @@ body {
   font-family: 'Noto Serif SC', "Songti SC", "SimSun", serif;
   background-color: var(--bg-color);
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.7;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -29,6 +34,7 @@ body {
 .container {
   width: 100%;
   max-width: 600px;
+  min-width: 0;
 }
 
 .container.wide-layout {
@@ -126,6 +132,13 @@ h1 {
   color: var(--text-primary);
   font-size: 1.08rem;
   line-height: 1.8;
+}
+
+.question-note {
+  margin-top: 0.7rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
 .hero-actions {
@@ -232,6 +245,14 @@ button.home-entry:hover {
 /* Form Styles */
 .form-group {
   margin-bottom: 1.5rem;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 label {
@@ -406,10 +427,51 @@ button {
   text-align: center;
 }
 
+.sheet-intro,
+.details-copy {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.sheet-intro {
+  margin: 0 0 1.1rem;
+}
+
 .bazi-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.bazi-lite-panel,
+.advanced-time-panel {
+  margin: -0.25rem 0 1.2rem;
+  padding: 0.9rem 1rem 0;
+  border: 1px solid rgba(192, 160, 98, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+}
+
+.bazi-lite-panel summary,
+.advanced-time-panel summary {
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--accent-gold);
+  font-size: 0.95rem;
+  line-height: 44px;
+}
+
+.bazi-lite-panel[open],
+.advanced-time-panel[open] {
+  border-color: rgba(192, 160, 98, 0.26);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bazi-lite-panel .details-copy,
+.advanced-time-panel .details-copy {
+  margin: -0.15rem 0 1rem;
 }
 
 .checkbox-row {
@@ -437,6 +499,28 @@ button {
   border-top: 1px solid var(--border-color);
 }
 
+.bazi-reverse-summary {
+  min-height: 52px;
+  cursor: pointer;
+  color: var(--accent-gold);
+  line-height: 1.5;
+}
+
+.bazi-reverse-summary span,
+.bazi-reverse-summary small {
+  display: block;
+}
+
+.bazi-reverse-summary span {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.bazi-reverse-summary small {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
 .bazi-subform .section-intro {
   margin-bottom: 1rem;
 }
@@ -444,6 +528,49 @@ button {
 .bazi-reverse-submit-btn {
   width: 100%;
   margin-top: 0;
+}
+
+.mobile-sheet-trigger {
+  display: none;
+  margin-bottom: 1rem;
+}
+
+.sheet-backdrop {
+  display: none;
+}
+
+.mobile-sheet {
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.mobile-sheet.active {
+  transform: translateY(0);
+}
+
+.mobile-sheet-header {
+  display: none;
+}
+
+.mobile-sheet-kicker {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.sheet-close-btn {
+  width: auto;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0.45rem 0.75rem;
+  background-color: transparent;
+  border: 1px solid rgba(192, 160, 98, 0.55);
+  border-radius: 6px;
+  box-shadow: none;
+  color: var(--accent-gold);
+  font-size: 0.9rem;
+  letter-spacing: 0;
 }
 
 .luohou-single-day-btn {
@@ -474,6 +601,8 @@ button {
 
 .bazi-result-wrapper {
   margin-top: 1.5rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .bazi-interpret-btn {
@@ -485,9 +614,11 @@ button {
 }
 
 .bazi-result {
+  max-width: 100%;
   max-height: 520px;
   overflow: auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
   background-color: rgba(15, 18, 20, 0.7);
   border: 1px solid var(--border-color);
@@ -501,10 +632,14 @@ button {
 
 .structured-result-list {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   gap: 0.85rem;
 }
 
 .result-card {
+  min-width: 0;
+  max-width: 100%;
   padding: 1rem;
   background-color: rgba(15, 18, 20, 0.48);
   border: 1px solid rgba(192, 160, 98, 0.22);
@@ -525,6 +660,8 @@ button {
   font-size: 0.95rem;
   line-height: 1.75;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .result-card-list {
@@ -533,11 +670,19 @@ button {
   color: var(--text-primary);
   font-size: 0.95rem;
   line-height: 1.75;
+  min-width: 0;
+}
+
+.result-card-list li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .raw-result-details {
   margin-top: 0.85rem;
   color: var(--text-secondary);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .raw-result-details summary {
@@ -553,8 +698,16 @@ button {
 }
 
 @media (max-width: 560px) {
+  body {
+    padding: 1rem 0.75rem;
+  }
+
   .container {
     max-width: 100%;
+  }
+
+  .card {
+    padding: 1.25rem;
   }
 
   .hero-panel {
@@ -566,6 +719,10 @@ button {
     font-size: 1.8rem;
   }
 
+  .question-echo {
+    padding: 0.9rem;
+  }
+
   .home-subgrid,
   .method-summary {
     grid-template-columns: 1fr;
@@ -573,6 +730,19 @@ button {
 
   .bazi-grid {
     grid-template-columns: 1fr;
+  }
+
+  .result-card {
+    padding: 0.85rem;
+  }
+
+  .result-card-list {
+    padding-left: 0.95rem;
+  }
+
+  .bazi-result {
+    padding: 0.85rem;
+    font-size: 0.86rem;
   }
 
   .luohou-layout {
@@ -584,6 +754,82 @@ button {
     padding-top: 1rem;
     border-left: 0;
     border-top: 1px solid var(--border-color);
+  }
+
+  .mobile-sheet-trigger {
+    display: block;
+  }
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: block;
+    pointer-events: none;
+    background-color: rgba(0, 0, 0, 0);
+    opacity: 0;
+    transition: opacity 0.3s ease, background-color 0.3s ease;
+  }
+
+  .sheet-backdrop.active {
+    pointer-events: auto;
+    background-color: rgba(0, 0, 0, 0.56);
+    opacity: 1;
+  }
+
+  body.sheet-open {
+    overflow: hidden;
+  }
+
+  .mobile-sheet {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 90;
+    max-height: min(86dvh, 720px);
+    overflow-y: auto;
+    padding: 1rem 1rem calc(1.2rem + env(safe-area-inset-bottom));
+    background-color: rgba(26, 29, 32, 0.96);
+    border: 1px solid rgba(192, 160, 98, 0.35);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.62);
+  }
+
+  .mobile-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .mobile-sheet-header h3 {
+    color: var(--accent-gold);
+    font-size: 1.18rem;
+    line-height: 1.35;
+  }
+}
+
+@media (min-width: 721px) {
+  .mobile-sheet {
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .home-section,
+  .mobile-sheet,
+  .sheet-backdrop,
+  .taiji-spin,
+  .cursor-blink {
+    animation: none;
+    transition: none;
   }
 }
 
@@ -698,12 +944,39 @@ button {
   font-size: 0.8em;
 }
 
+.question-echo {
+  margin-bottom: 1.4rem;
+  padding: 1rem 1.1rem;
+  background-color: rgba(223, 194, 139, 0.045);
+  border: 1px solid rgba(192, 160, 98, 0.2);
+  border-radius: 8px;
+}
+
+.question-echo-label {
+  display: inline-block;
+  color: var(--accent-gold);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.question-echo-text {
+  margin-top: 0.4rem;
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
 .content-box {
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: rgba(223, 194, 139, 0.045);
+  background-image: linear-gradient(90deg, rgba(220, 208, 177, 0.035) 1px, transparent 1px);
+  background-size: 18px 100%;
+  backdrop-filter: blur(10px);
   padding: 1.5rem;
   border-radius: 4px;
   border-left: 3px solid var(--accent-gold);
   font-size: 1.1rem;
+  line-height: 1.7;
   white-space: pre-wrap;
   min-height: 150px;
 }
@@ -759,15 +1032,18 @@ button {
   height: 1.1em;
   background-color: var(--accent-gold);
   vertical-align: text-bottom;
-  animation: blink 1s step-end infinite;
   margin-left: 2px;
+}
+
+.cursor-blink {
+  animation: cursorBlink 1s step-end infinite;
 }
 
 .cursor.hidden {
   display: none;
 }
 
-@keyframes blink {
+@keyframes cursorBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
@@ -844,8 +1120,63 @@ button {
   display: none !important;
 }
 
+.share-only-block {
+  display: none;
+}
+
+.share-mode .share-only-block {
+  display: block !important;
+}
+
+.share-card-footer {
+  margin-top: 1.35rem;
+  padding: 1.35rem 1.2rem 0.25rem;
+  border-top: 1px solid rgba(192, 160, 98, 0.28);
+  text-align: center;
+}
+
+.share-card-kicker {
+  display: block;
+  color: var(--accent-gold);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.share-card-quote {
+  margin-top: 0.75rem;
+  color: #f4ead2;
+  font-size: 1.35rem;
+  line-height: 1.8;
+}
+
+.share-card-signoff {
+  margin-top: 0.85rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.share-mode #interpretation-emotion-block,
+.share-mode .flow-recommendation {
+  display: none !important;
+}
+
+.share-mode #interpretation-modern-block {
+  margin-top: 0 !important;
+}
+
+.share-mode #interpretation-modern-block .content-box {
+  min-height: 0;
+  border-left-width: 2px;
+  background-image: none;
+}
+
 .share-btn-style {
-  /* 只需要保留或清空额外类即可，样式靠容器和 secondary-btn 控制 */
+  flex: 1 1 220px !important;
+  font-size: 1.02rem;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .footer-actions {

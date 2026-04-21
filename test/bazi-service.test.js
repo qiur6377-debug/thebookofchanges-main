@@ -24,8 +24,54 @@ test('builds bazi.py arguments for solar female readings', () => {
     gender: 'female',
   });
 
-  assert.deepEqual(args.slice(-6), ['-g', '-n', '1990', '5', '12', '9']);
   assert.match(args[0], /bazi-master\/bazi\.py$/);
+  assert.deepEqual(args.slice(1), [
+    '-g',
+    '-n',
+    '--minute',
+    '0',
+    '--zi-mode',
+    'midnight',
+    '1990',
+    '5',
+    '12',
+    '9',
+  ]);
+});
+
+test('builds precise bazi.py arguments for true solar time and zi-hour mode', () => {
+  const args = buildBaziArgs({
+    year: 2000,
+    month: 6,
+    day: 3,
+    hour: 23,
+    minute: 45,
+    calendar: 'solar',
+    gender: 'female',
+    birthPlace: '北京',
+    longitude: '116.397',
+    trueSolar: true,
+    ziMode: 'zi-start',
+  });
+
+  assert.match(args[0], /bazi-master\/bazi\.py$/);
+  assert.deepEqual(args.slice(1), [
+    '-g',
+    '-n',
+    '--minute',
+    '45',
+    '--birth-place',
+    '北京',
+    '--longitude',
+    '116.397',
+    '--true-solar',
+    '--zi-mode',
+    'zi-start',
+    '2000',
+    '6',
+    '3',
+    '23',
+  ]);
 });
 
 test('normalizes lunar leap-month male readings', () => {
@@ -44,9 +90,14 @@ test('normalizes lunar leap-month male readings', () => {
       month: 4,
       day: 18,
       hour: 23,
+      minute: 0,
       calendar: 'lunar',
       gender: 'male',
       leapMonth: true,
+      birthPlace: '',
+      longitude: null,
+      trueSolar: false,
+      ziMode: 'midnight',
     }
   );
 });
@@ -55,6 +106,18 @@ test('rejects invalid birth hours before invoking python', async () => {
   await assert.rejects(
     () => runBaziReading({ year: 1990, month: 5, day: 12, hour: 24 }),
     /出生时辰必须在 0 到 23 之间/
+  );
+});
+
+test('rejects invalid birth minutes and true-solar longitude before invoking python', async () => {
+  await assert.rejects(
+    () => runBaziReading({ year: 1990, month: 5, day: 12, hour: 9, minute: 60 }),
+    /出生分钟必须在 0 到 59 之间/
+  );
+
+  await assert.rejects(
+    () => runBaziReading({ year: 1990, month: 5, day: 12, hour: 9, trueSolar: true }),
+    /使用真太阳时必须填写出生地经度/
   );
 });
 
@@ -79,6 +142,30 @@ test('returns stdout and strips terminal escape codes', async () => {
   );
 
   assert.equal(result.output, '女命\n八字结果');
+});
+
+test('removes bazi upstream contact copy from reading output', async () => {
+  const fakeSpawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => {};
+
+    process.nextTick(() => {
+      child.stdout.emit('data', Buffer.from('四柱：癸未 辛酉 己酉 乙亥 解读:钉ding或v信pythontesting\n正常结果'));
+      child.emit('close', 0);
+    });
+
+    return child;
+  };
+
+  const result = await runBaziReading(
+    { year: 1990, month: 5, day: 12, hour: 9, calendar: 'solar', gender: 'female' },
+    { spawnImpl: fakeSpawn }
+  );
+
+  assert.equal(result.output, '四柱：癸未 辛酉 己酉 乙亥\n正常结果');
+  assert.doesNotMatch(result.output, /钉|微信|v信|pythontesting|技术支持|解读:/);
 });
 
 test('builds bazi.py arguments for reverse four-pillar lookup', () => {
@@ -195,7 +282,9 @@ test('builds plain-language AI messages from a bazi reading', () => {
   assert.match(messages[0].content, /不要寒暄/);
   assert.match(messages[0].content, /不要使用 emoji/);
   assert.match(messages[0].content, /不要使用 Markdown/);
-  assert.match(messages[0].content, /第一行必须是「整体印象：」/);
+  assert.match(messages[0].content, /懂命理、也懂年轻人情绪的朋友/);
+  assert.match(messages[0].content, /不要下命运结论/);
+  assert.match(messages[0].content, /第一行必须是「你给人的底色：」/);
   assert.match(messages[0].content, /禁止出现“这份八字排盘/);
   assert.equal(messages[1].role, 'user');
   assert.match(messages[1].content, /四柱：庚午 辛巳 丁丑 乙巳/);

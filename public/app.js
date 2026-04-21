@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const divineBtn = document.getElementById('divine-btn');
     const resetBtn = document.getElementById('reset-btn');
     const resultHomeBtn = document.getElementById('result-home-btn');
+    const shareCardFooter = document.getElementById('share-card-footer');
+    const shareCardQuote = document.getElementById('share-card-quote');
+    const questionEcho = document.getElementById('question-echo');
+    const questionEchoText = document.getElementById('question-echo-text');
     
     const hexTitle = document.getElementById('hexagram-title');
     const hexLinesContainer = document.getElementById('hexagram-lines');
@@ -80,6 +84,41 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }, 10);
     }
+
+    function openMobileSheet(sheet) {
+        if (!sheet) return;
+        const section = sheet.closest('section');
+        const backdrop = section ? section.querySelector('.sheet-backdrop') : null;
+        sheet.classList.add('active');
+        sheet.setAttribute('aria-hidden', 'false');
+        if (backdrop) backdrop.classList.add('active');
+        document.body.classList.add('sheet-open');
+    }
+
+    function closeMobileSheets() {
+        document.querySelectorAll('.mobile-sheet.active').forEach(sheet => {
+            sheet.classList.remove('active');
+            sheet.setAttribute('aria-hidden', 'true');
+        });
+        document.querySelectorAll('.sheet-backdrop.active').forEach(backdrop => {
+            backdrop.classList.remove('active');
+        });
+        document.body.classList.remove('sheet-open');
+    }
+
+    document.querySelectorAll('[data-sheet-target]').forEach(button => {
+        button.addEventListener('click', () => {
+            openMobileSheet(document.getElementById(button.dataset.sheetTarget));
+        });
+    });
+
+    document.querySelectorAll('[data-sheet-close]').forEach(control => {
+        control.addEventListener('click', closeMobileSheets);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeMobileSheets();
+    });
 
     function setFormMessage(target, message, state = 'error') {
         if (!target) return;
@@ -158,9 +197,73 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        appendResultCard(container, '核心信息', pickLines(lines, /命|四柱|八字|年柱|月柱|日柱|时柱|五行|大运/, 6));
+        appendResultCard(container, '核心信息', pickLines(lines, /排盘提示|校时|真太阳时|命|四柱|八字|年柱|月柱|日柱|时柱|五行|大运/, 6));
         appendResultCard(container, '详细信息', lines.slice(0, 12));
         appendResultCard(container, '下一步建议', '先看大方向，再用下面的大白话解读把复杂术语翻译成容易理解的判断。');
+    }
+
+    function escapeHtml(text) {
+        return String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function renderStreamingText(target, text, options = {}) {
+        if (!target) return;
+        const cursorId = options.cursorId || 'typer-cursor';
+        const withCursor = options.withCursor !== false;
+        const cursor = withCursor ? `<span class="cursor cursor-blink" id="${cursorId}"></span>` : '';
+        const html = escapeHtml(text).replace(/\n/g, '<br>');
+        target.innerHTML = html + cursor;
+        target.scrollTop = target.scrollHeight;
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function scrollToResult(target) {
+        if (!target) return;
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
+
+    function extractShareSentence() {
+        const modernText = String(interpContentModern?.textContent || '').trim();
+        const emotionText = String(interpContent?.textContent || '').trim();
+        const takeawayMatch = modernText.match(/给你一句话[:：]\s*([^\n]+)/);
+        if (takeawayMatch && takeawayMatch[1]) {
+            return takeawayMatch[1].trim();
+        }
+
+        const actionMatch = modernText.match(/你可以怎么做[:：]\s*([^\n]+)/);
+        if (actionMatch && actionMatch[1]) {
+            return actionMatch[1].trim();
+        }
+
+        const firstModernLine = modernText.split('\n').map(line => line.trim()).find(Boolean);
+        if (firstModernLine) {
+            return firstModernLine;
+        }
+
+        const firstEmotionLine = emotionText.split('\n').map(line => line.trim()).find(Boolean);
+        if (firstEmotionLine) {
+            return firstEmotionLine;
+        }
+
+        return '先把心放稳，答案会慢一点出现。';
+    }
+
+    function prepareShareCard() {
+        if (!shareCardFooter || !shareCardQuote) return;
+        shareCardQuote.textContent = extractShareSentence();
+        shareCardFooter.setAttribute('aria-hidden', 'false');
+    }
+
+    function cleanupShareCard() {
+        if (!shareCardFooter) return;
+        shareCardFooter.setAttribute('aria-hidden', 'true');
     }
 
     function openZhouyiSection() {
@@ -168,6 +271,13 @@ document.addEventListener('DOMContentLoaded', () => {
         divineBtn.disabled = false;
         showSection(questionSection);
         setTimeout(() => questionInput.focus(), 80);
+    }
+
+    function updateQuestionEcho(question) {
+        if (!questionEcho || !questionEchoText) return;
+        const cleanQuestion = String(question || '').trim();
+        questionEchoText.textContent = cleanQuestion;
+        questionEcho.style.display = cleanQuestion ? 'block' : 'none';
     }
 
     function hideZhouyiRecommendations() {
@@ -248,6 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 已经切换到结果页
                 showSection(resultSection);
+                updateQuestionEcho(question);
                 
                 // 将数据存入全局
                 currentQuestion = question;
@@ -300,9 +411,9 @@ document.addEventListener('DOMContentLoaded', () => {
         interpWrapper.style.display = 'block';
         
         // 清理旧的文本，只留 cursor
-        interpContent.innerHTML = '<span class="cursor" id="typer-cursor"></span>';
+        interpContent.innerHTML = '<span class="cursor cursor-blink" id="typer-cursor"></span>';
         if (interpContentModern) {
-            interpContentModern.innerHTML = '<span class="cursor hidden" id="typer-cursor-modern"></span>';
+            interpContentModern.innerHTML = '<span class="cursor cursor-blink hidden" id="typer-cursor-modern"></span>';
         }
         hideZhouyiRecommendations();
                 
@@ -365,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const parts = currentText.split(splitRegex);
                             // 锁定古文部分并隐藏光标
                             if (parts[0]) {
-                                interpContent.innerHTML = parts[0].trim().replace(/\n/g, '<br>');
+                                renderStreamingText(interpContent, parts[0].trim(), { withCursor: false, cursorId: 'typer-cursor' });
                             }
                             const cursor1 = document.getElementById('typer-cursor');
                             if(cursor1) cursor1.classList.add('hidden');
@@ -378,11 +489,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         if (!isModern) {
-                            interpContent.innerHTML = currentText.replace(/\n/g, '<br>') + '<span class="cursor" id="typer-cursor"></span>';
-                            interpContent.scrollTop = interpContent.scrollHeight;
+                            renderStreamingText(interpContent, currentText, { cursorId: 'typer-cursor' });
                         } else {
-                            interpContentModern.innerHTML = currentText.replace(/\n/g, '<br>') + '<span class="cursor" id="typer-cursor-modern"></span>';
-                            interpContentModern.scrollTop = interpContentModern.scrollHeight;
+                            renderStreamingText(interpContentModern, currentText, { cursorId: 'typer-cursor-modern' });
                         }
                     } else if (data.type === 'error') {
                         throw new Error(data.message);
@@ -413,10 +522,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     resetBtn.addEventListener('click', () => {
         questionInput.value = '';
+        updateQuestionEcho('');
         showSection(questionSection);
         divineBtn.disabled = false;
     });
-    resultHomeBtn.addEventListener('click', () => showSection(homeSection));
+    resultHomeBtn.addEventListener('click', () => {
+        updateQuestionEcho('');
+        showSection(homeSection);
+    });
 
     // ============ 八字排盘 ============
     const baziBackBtn = document.getElementById('bazi-back-btn');
@@ -427,6 +540,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const baziMonth = document.getElementById('bazi-month');
     const baziDay = document.getElementById('bazi-day');
     const baziHour = document.getElementById('bazi-hour');
+    const baziMinute = document.getElementById('bazi-minute');
+    const baziBirthPlace = document.getElementById('bazi-birth-place');
+    const baziLongitude = document.getElementById('bazi-longitude');
+    const baziTrueSolar = document.getElementById('bazi-true-solar');
+    const baziZiMode = document.getElementById('bazi-zi-mode');
     const baziLeapMonth = document.getElementById('bazi-leap-month');
     const baziMessage = document.getElementById('bazi-message');
     const baziResultWrapper = document.getElementById('bazi-result-wrapper');
@@ -443,6 +561,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const reverseStartYear = document.getElementById('reverse-start-year');
     const reverseEndYear = document.getElementById('reverse-end-year');
     const baziReverseSubmitBtn = document.getElementById('bazi-reverse-submit-btn');
+    const BAZI_CITY_LONGITUDES = {
+        北京: '116.397',
+        上海: '121.473',
+        广州: '113.264',
+        深圳: '114.057',
+        杭州: '120.155',
+        南京: '118.796',
+        成都: '104.066',
+        重庆: '106.551',
+        武汉: '114.305',
+        西安: '108.940',
+        长沙: '112.938',
+        郑州: '113.625',
+        天津: '117.201',
+        青岛: '120.382',
+        厦门: '118.089',
+        福州: '119.296',
+        昆明: '102.833',
+        沈阳: '123.431',
+        哈尔滨: '126.535',
+        乌鲁木齐: '87.617',
+        香港: '114.170',
+        澳门: '113.543',
+        台北: '121.565'
+    };
     let currentBaziOutput = '';
 
     function updateLeapMonthState() {
@@ -457,6 +600,14 @@ document.addEventListener('DOMContentLoaded', () => {
         showSection(baziSection);
     }
 
+    function getBaziLongitude() {
+        const manualLongitude = baziLongitude.value.trim();
+        if (manualLongitude) return manualLongitude;
+
+        const city = baziBirthPlace.value.trim().replace(/市$/, '');
+        return BAZI_CITY_LONGITUDES[city] || '';
+    }
+
     function readBaziPayload() {
         return {
             calendar: baziCalendar.value,
@@ -465,7 +616,12 @@ document.addEventListener('DOMContentLoaded', () => {
             month: baziMonth.value,
             day: baziDay.value,
             hour: baziHour.value,
-            leapMonth: baziLeapMonth.checked
+            minute: baziMinute.value,
+            leapMonth: baziLeapMonth.checked,
+            birthPlace: baziBirthPlace.value,
+            longitude: getBaziLongitude(),
+            trueSolar: baziTrueSolar.checked,
+            ziMode: baziZiMode.value
         };
     }
 
@@ -475,19 +631,25 @@ document.addEventListener('DOMContentLoaded', () => {
             setFormMessage(baziMessage, '请把出生年月日时填写完整。');
             return;
         }
+        if (payload.trueSolar && !payload.longitude) {
+            setFormMessage(baziMessage, '使用真太阳时请先选择一个常见出生城市；找不到城市时，再展开“手动填写经度”。');
+            return;
+        }
 
         clearFormMessage(baziMessage);
+        closeMobileSheets();
         const originalText = baziSubmitBtn.textContent;
         baziSubmitBtn.disabled = true;
         baziSubmitBtn.textContent = '排盘中...';
         baziResultWrapper.style.display = 'block';
+        scrollToResult(baziResultWrapper);
         baziResultTitle.textContent = '排盘结果';
         renderStructuredResult(baziResultCards, '正在推演四柱，请稍候...', 'bazi');
         baziResult.textContent = '正在推演四柱，请稍候...';
         baziInterpretBtn.style.display = 'none';
         baziInterpretWrapper.style.display = 'none';
         baziZhouyiRecommendation.style.display = 'none';
-        baziInterpretContent.innerHTML = '<span class="cursor" id="bazi-typer-cursor"></span>';
+        baziInterpretContent.innerHTML = '<span class="cursor cursor-blink" id="bazi-typer-cursor"></span>';
         currentBaziOutput = '';
 
         try {
@@ -506,10 +668,12 @@ document.addEventListener('DOMContentLoaded', () => {
             renderStructuredResult(baziResultCards, currentBaziOutput || '排盘完成，但脚本没有返回内容', 'bazi');
             baziResult.textContent = currentBaziOutput || '排盘完成，但脚本没有返回内容';
             baziInterpretBtn.style.display = currentBaziOutput ? 'block' : 'none';
+            scrollToResult(baziResultWrapper);
         } catch (error) {
             renderStructuredResult(baziResultCards, error.message, 'bazi');
             baziResult.textContent = error.message;
             setFormMessage(baziMessage, error.message);
+            scrollToResult(baziResultWrapper);
         } finally {
             baziSubmitBtn.disabled = false;
             baziSubmitBtn.textContent = originalText;
@@ -545,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         baziInterpretBtn.style.display = 'none';
         baziInterpretWrapper.style.display = 'none';
         baziZhouyiRecommendation.style.display = 'none';
-        baziInterpretContent.innerHTML = '<span class="cursor" id="bazi-typer-cursor"></span>';
+        baziInterpretContent.innerHTML = '<span class="cursor cursor-blink" id="bazi-typer-cursor"></span>';
         currentBaziOutput = '';
 
         try {
@@ -584,16 +748,17 @@ document.addEventListener('DOMContentLoaded', () => {
         baziInterpretBtn.textContent = '解读中...';
         baziInterpretWrapper.style.display = 'block';
         baziZhouyiRecommendation.style.display = 'none';
-        baziInterpretContent.innerHTML = '<span class="cursor" id="bazi-typer-cursor"></span>';
+        baziInterpretContent.innerHTML = '<span class="cursor cursor-blink" id="bazi-typer-cursor"></span>';
 
         let currentText = '';
 
         function renderBaziInterpretation(text, withCursor) {
-            const formalStart = text.search(/整体印象[：:]/);
+            const formalStart = text.search(/你给人的底色[：:]/);
             const visibleText = formalStart > 0 ? text.slice(formalStart) : text;
-            const cursor = withCursor ? '<span class="cursor" id="bazi-typer-cursor"></span>' : '';
-            baziInterpretContent.innerHTML = visibleText.replace(/\n/g, '<br>') + cursor;
-            baziInterpretContent.scrollTop = baziInterpretContent.scrollHeight;
+            renderStreamingText(baziInterpretContent, visibleText, {
+                cursorId: 'bazi-typer-cursor',
+                withCursor
+            });
         }
 
         try {
@@ -652,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
             baziInterpretContent.textContent = error.message || '八字解读失败，请稍后再试';
         } finally {
             baziInterpretBtn.disabled = false;
-            baziInterpretBtn.textContent = '重新生成大白话解读';
+            baziInterpretBtn.textContent = '重新看看自己';
         }
     }
 
@@ -757,8 +922,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function startLuohouReading(daysOverride) {
         ensureLuohouDefaults();
-        const queryDays = daysOverride || luohouDays.value;
+        const queryDays = daysOverride === undefined ? luohouDays.value : daysOverride;
         clearFormMessage(luohouMessage);
+        closeMobileSheets();
         const originalText = luohouSubmitBtn.textContent;
         const originalSingleText = luohouSingleDayBtn.textContent;
         luohouSubmitBtn.disabled = true;
@@ -772,7 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
         luohouResult.textContent = '正在查罗喉日时与择日辅助...';
         luohouInterpretBtn.style.display = 'none';
         luohouInterpretWrapper.style.display = 'none';
-        luohouInterpretContent.innerHTML = '<span class="cursor" id="luohou-typer-cursor"></span>';
+        luohouInterpretContent.innerHTML = '<span class="cursor cursor-blink" id="luohou-typer-cursor"></span>';
         currentLuohouOutput = '';
 
         try {
@@ -821,14 +987,15 @@ document.addEventListener('DOMContentLoaded', () => {
         luohouInterpretBtn.disabled = true;
         luohouInterpretBtn.textContent = '解读中...';
         luohouInterpretWrapper.style.display = 'block';
-        luohouInterpretContent.innerHTML = '<span class="cursor" id="luohou-typer-cursor"></span>';
+        luohouInterpretContent.innerHTML = '<span class="cursor cursor-blink" id="luohou-typer-cursor"></span>';
 
         let currentText = '';
 
         function renderLuohouInterpretation(text, withCursor) {
-            const cursor = withCursor ? '<span class="cursor" id="luohou-typer-cursor"></span>' : '';
-            luohouInterpretContent.innerHTML = text.replace(/\n/g, '<br>') + cursor;
-            luohouInterpretContent.scrollTop = luohouInterpretContent.scrollHeight;
+            renderStreamingText(luohouInterpretContent, text, {
+                cursorId: 'luohou-typer-cursor',
+                withCursor
+            });
         }
 
         try {
@@ -886,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
             luohouInterpretContent.textContent = error.message || '罗喉择日解读失败，请稍后再试';
         } finally {
             luohouInterpretBtn.disabled = false;
-            luohouInterpretBtn.textContent = '重新生成大白话解读';
+            luohouInterpretBtn.textContent = '重新帮我挑重点';
         }
     }
 
@@ -894,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openLuohouSection();
     });
     luohouBackBtn.addEventListener('click', () => showSection(homeSection));
-    luohouSubmitBtn.addEventListener('click', startLuohouReading);
+    luohouSubmitBtn.addEventListener('click', () => startLuohouReading());
     luohouSingleDayBtn.addEventListener('click', startLuohouSingleDayReading);
     luohouInterpretBtn.addEventListener('click', startLuohouInterpretation);
     recommendBaziBtn.addEventListener('click', openBaziSection);
@@ -1065,6 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // 切换到结果页
                         showSection(resultSection);
+                        updateQuestionEcho(currentQuestion);
                         currentHexagramNumber = data.hexagramNumber;
                         currentChangingPositions = data.changingPositions || [];
                         currentChangedHexagramNumber = data.changedHexagramNumber;
@@ -1130,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof window.html2canvas === 'undefined') {
                 shareBtn.textContent = '截图插件未就绪';
                 setTimeout(() => {
-                    shareBtn.textContent = '保存分享图';
+                    shareBtn.textContent = '保存心安分享图';
                 }, 1600);
                 return;
             }
@@ -1143,6 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const actionsEl = document.getElementById('result-actions');
             
             // 截图前加上专用样式，确保黑底白字或特定的背景，防止透明
+            prepareShareCard();
             targetEl.classList.add('share-mode');
             // 隐藏操作按钮
             actionsEl.classList.add('share-hide');
@@ -1155,6 +1324,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 // 恢复原状
+                cleanupShareCard();
                 targetEl.classList.remove('share-mode');
                 actionsEl.classList.remove('share-hide');
                 shareBtn.textContent = originalText;
@@ -1165,7 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 触发下载
                 const link = document.createElement('a');
-                link.download = `周易算卦_${Date.now()}.png`;
+                link.download = `心安分享图_${Date.now()}.png`;
                 link.href = imgData;
                 document.body.appendChild(link);
                 link.click();
@@ -1173,6 +1343,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error('截图失败', err);
+                cleanupShareCard();
                 targetEl.classList.remove('share-mode');
                 actionsEl.classList.remove('share-hide');
                 shareBtn.textContent = '截图失败，请重试';
