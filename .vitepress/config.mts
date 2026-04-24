@@ -41,6 +41,14 @@ export default defineConfig({
   title: "周易",
   description: "周易",
   base: "/thebookofchanges/",
+  srcExclude: [
+    'analysis/**/*',
+    'bazi-master/**/*',
+    'design-references/**/*',
+    'docs/**/*',
+    'memory/**/*',
+    'node_modules/**/*'
+  ],
   head: [
     ['link', { rel: 'icon', href: 'yi.svg' }] // 这里是你的 Logo 图片路径
   ],

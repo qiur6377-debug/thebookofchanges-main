@@ -1,11 +1,18 @@
 {
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "markdown-it": "^14.1.0",
+    "vite": "^8.0.10",
     "vitepress": "^1.1.4"
+  },
+  "overrides": {
+    "esbuild": "^0.28.0",
+    "vite": "^8.0.10"
   },
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
+    "analytics": "node scripts/analytics-summary.js",
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview"

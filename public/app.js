@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetBtn = document.getElementById('reset-btn');
     const resultHomeBtn = document.getElementById('result-home-btn');
     const shareCardFooter = document.getElementById('share-card-footer');
+    const shareCardContext = document.getElementById('share-card-context');
     const shareCardQuote = document.getElementById('share-card-quote');
     const questionEcho = document.getElementById('question-echo');
     const questionEchoText = document.getElementById('question-echo-text');
@@ -211,15 +212,31 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, '&#39;');
     }
 
+    function shouldStickStreamingContent(target) {
+        if (!target) return false;
+        const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+        return distanceFromBottom <= 80;
+    }
+
     function renderStreamingText(target, text, options = {}) {
         if (!target) return;
         const cursorId = options.cursorId || 'typer-cursor';
         const withCursor = options.withCursor !== false;
+        const keepViewportPinned = shouldStickStreamingContent(target);
         const cursor = withCursor ? `<span class="cursor cursor-blink" id="${cursorId}"></span>` : '';
         const html = escapeHtml(text).replace(/\n/g, '<br>');
         target.innerHTML = html + cursor;
-        target.scrollTop = target.scrollHeight;
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        if (keepViewportPinned) {
+            target.scrollTop = target.scrollHeight;
+        }
+    }
+
+    function getClassicEmotionText(rawText) {
+        const normalized = String(rawText || '').replace(/\r/g, '');
+        if (normalized.includes('[定心话]')) {
+            return normalized.split('[定心话]').pop().trim();
+        }
+        return normalized.replace(/\[一句判断\]/g, '').trim();
     }
 
     function scrollToResult(target) {
@@ -257,12 +274,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function prepareShareCard() {
         if (!shareCardFooter || !shareCardQuote) return;
+        const questionForCard = String(currentQuestion || '').trim();
+        if (shareCardContext) {
+            shareCardContext.textContent = questionForCard
+                ? `关于：${questionForCard}`
+                : '关于你现在最放不下的这件事';
+        }
         shareCardQuote.textContent = extractShareSentence();
         shareCardFooter.setAttribute('aria-hidden', 'false');
     }
 
     function cleanupShareCard() {
         if (!shareCardFooter) return;
+        if (shareCardContext) {
+            shareCardContext.textContent = '关于你现在最放不下的这件事';
+        }
         shareCardFooter.setAttribute('aria-hidden', 'true');
     }
 
@@ -359,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 已经切换到结果页
                 showSection(resultSection);
                 updateQuestionEcho(question);
+                scrollToResult(resultSection);
                 
                 // 将数据存入全局
                 currentQuestion = question;
@@ -390,10 +417,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     changedHexagram.style.display = 'none';
                 }
                 
-                // 此时还未解卦，显示解卦按钮，隐藏解析内容
-                interpretBtn.style.display = 'block';
-                interpWrapper.style.display = 'none';
+                // 先把情绪解读放到前面，再把卦象细节留给用户慢慢看
+                interpretBtn.style.display = 'none';
+                interpWrapper.style.display = 'block';
                 hideZhouyiRecommendations();
+                await startInterpretation();
 
             } catch (error) {
                 console.error('Fetch 错误:', error);
@@ -476,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const parts = currentText.split(splitRegex);
                             // 锁定古文部分并隐藏光标
                             if (parts[0]) {
-                                renderStreamingText(interpContent, parts[0].trim(), { withCursor: false, cursorId: 'typer-cursor' });
+                                renderStreamingText(interpContent, getClassicEmotionText(parts[0]), { withCursor: false, cursorId: 'typer-cursor' });
                             }
                             const cursor1 = document.getElementById('typer-cursor');
                             if(cursor1) cursor1.classList.add('hidden');
@@ -489,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         if (!isModern) {
-                            renderStreamingText(interpContent, currentText, { cursorId: 'typer-cursor' });
+                            renderStreamingText(interpContent, getClassicEmotionText(currentText), { cursorId: 'typer-cursor' });
                         } else {
                             renderStreamingText(interpContentModern, currentText, { cursorId: 'typer-cursor-modern' });
                         }
@@ -640,10 +668,10 @@ document.addEventListener('DOMContentLoaded', () => {
         closeMobileSheets();
         const originalText = baziSubmitBtn.textContent;
         baziSubmitBtn.disabled = true;
-        baziSubmitBtn.textContent = '排盘中...';
+        baziSubmitBtn.textContent = '查看中...';
         baziResultWrapper.style.display = 'block';
         scrollToResult(baziResultWrapper);
-        baziResultTitle.textContent = '排盘结果';
+        baziResultTitle.textContent = '你的底色和节奏';
         renderStructuredResult(baziResultCards, '正在推演四柱，请稍候...', 'bazi');
         baziResult.textContent = '正在推演四柱，请稍候...';
         baziInterpretBtn.style.display = 'none';
@@ -703,7 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
         baziReverseSubmitBtn.disabled = true;
         baziReverseSubmitBtn.textContent = '反推中...';
         baziResultWrapper.style.display = 'block';
-        baziResultTitle.textContent = '反推结果';
+        baziResultTitle.textContent = '可能的出生时间';
         renderStructuredResult(baziResultCards, '正在反推可能出生时间，请稍候...', 'bazi');
         baziResult.textContent = '正在反推可能出生时间，请稍候...';
         baziInterpretBtn.style.display = 'none';
@@ -1233,6 +1261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 切换到结果页
                         showSection(resultSection);
                         updateQuestionEcho(currentQuestion);
+                        scrollToResult(resultSection);
                         currentHexagramNumber = data.hexagramNumber;
                         currentChangingPositions = data.changingPositions || [];
                         currentChangedHexagramNumber = data.changedHexagramNumber;

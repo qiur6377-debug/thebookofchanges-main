@@ -17,6 +17,22 @@ const { streamQwenResponse } = require('./lib/ai-stream-service');
 const { createApiRateLimiter } = require('./lib/http-middleware');
 require('dotenv').config();
 
+const SAVE_DIVINATION_HISTORY = process.env.SAVE_DIVINATION_HISTORY === 'true';
+const MAX_QUESTION_LENGTH = 500;
+const BLOCKED_ANALYTICS_KEYS = new Set([
+  'question',
+  'content',
+  'text',
+  'message',
+  'email',
+  'phone',
+  'name',
+  'token',
+  'key',
+  'password',
+  'secret',
+]);
+
 // 如果还没安装 sqlite3，可能需要用户执行下 npm install sqlite3
 let db;
 try {
@@ -46,11 +62,13 @@ try {
 }
 
 const app = express();
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' || process.env.RENDER ? 1 : false);
 const PORT = process.env.PORT || 3000;
 const apiRateLimiter = createApiRateLimiter({
   windowMs: Number(process.env.API_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: Number(process.env.API_RATE_LIMIT_MAX) || 100,
 });
+const publicDir = path.join(__dirname, 'public');
 
 // ============ 知识库加载 ============
 
@@ -191,9 +209,119 @@ function divinate() {
 
 // ============ API 路由 ============
 
-app.use(express.json());
+app.use(express.json({ limit: '16kb' }));
 app.use('/api/', apiRateLimiter);
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'index.html'));
+});
+
+app.get('/classic', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'classic.html'));
+});
+
+app.use(express.static(publicDir));
+
+function sanitizeAnalyticsValue(value, depth = 0) {
+  if (depth > 1) return null;
+  if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.slice(0, 120);
+  if (Array.isArray(value)) {
+    return value.slice(0, 8).map(item => sanitizeAnalyticsValue(item, depth + 1));
+  }
+  if (typeof value === 'object' && value) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, 20)
+        .filter(([key]) => /^[a-zA-Z0-9_]+$/.test(key))
+        .map(([key, item]) => [key, sanitizeAnalyticsValue(item, depth + 1)])
+    );
+  }
+  return null;
+}
+
+function isBlockedAnalyticsKey(key) {
+  const normalized = String(key || '').toLowerCase();
+  return BLOCKED_ANALYTICS_KEYS.has(normalized)
+    || normalized.includes('question')
+    || normalized.includes('content')
+    || normalized.includes('token')
+    || normalized.includes('secret')
+    || normalized.includes('password');
+}
+
+function sanitizeAnalyticsPayload(payload = {}) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
+  return Object.fromEntries(
+    Object.entries(payload)
+      .slice(0, 24)
+      .filter(([key]) => /^[a-zA-Z0-9_]+$/.test(key))
+      .filter(([key]) => !isBlockedAnalyticsKey(key))
+      .map(([key, value]) => [key, sanitizeAnalyticsValue(value)])
+  );
+}
+
+function normalizeQuestionInput(value) {
+  if (typeof value !== 'string') return null;
+  const question = value.trim();
+  if (!question || question.length > MAX_QUESTION_LENGTH) return null;
+  return question;
+}
+
+function isValidYaoValues(value) {
+  return Array.isArray(value)
+    && value.length === 6
+    && value.every(item => Number.isInteger(item) && [6, 7, 8, 9].includes(item));
+}
+
+function normalizeChangingPositions(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > 6) return null;
+  const normalized = [];
+  for (const item of value) {
+    if (!Number.isInteger(item) || item < 0 || item > 5) return null;
+    if (!normalized.includes(item)) normalized.push(item);
+  }
+  return normalized;
+}
+
+function createRequestId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+/**
+ * POST /api/track
+ * 轻量产品埋点：只记录行为与长度等元数据，不记录用户提问原文。
+ */
+app.post('/api/track', (req, res) => {
+  const { event, payload, sessionId, timestamp, path: clientPath, viewportWidth } = req.body || {};
+  const normalizedEvent = String(event || '').trim();
+
+  if (!/^[a-zA-Z0-9_:-]{2,64}$/.test(normalizedEvent)) {
+    return res.status(400).json({ error: '埋点事件名无效' });
+  }
+
+  const record = {
+    event: normalizedEvent,
+    payload: sanitizeAnalyticsPayload(payload),
+    sessionId: String(sessionId || '').slice(0, 80),
+    path: String(clientPath || '').slice(0, 120),
+    viewportWidth: Number(viewportWidth) || null,
+    clientTimestamp: String(timestamp || '').slice(0, 40),
+    serverTimestamp: new Date().toISOString(),
+  };
+
+  fs.appendFile(
+    path.join(__dirname, 'analytics_events.log'),
+    `${JSON.stringify(record)}\n`,
+    (error) => {
+      if (error) {
+        console.error('写入埋点失败:', error.message);
+      }
+    }
+  );
+
+  res.json({ ok: true });
+});
 
 /**
  * POST /api/divine
@@ -203,15 +331,19 @@ app.use(express.static(path.join(__dirname, 'public')));
  *   2. 蓍草模式：同时传 yaoValues（前端 Canvas 交互生成），后端直接查表
  */
 app.post('/api/divine', (req, res) => {
-  const { question, yaoValues: manualYaoValues } = req.body;
+  const { yaoValues: manualYaoValues } = req.body || {};
+  const question = normalizeQuestionInput(req.body?.question);
 
-  if (!question || question.trim().length === 0) {
+  if (!question) {
     return res.status(400).json({ error: '请输入您想要占卜的问题' });
   }
 
   let result;
 
-  if (manualYaoValues && Array.isArray(manualYaoValues) && manualYaoValues.length === 6) {
+  if (manualYaoValues !== undefined) {
+    if (!isValidYaoValues(manualYaoValues)) {
+      return res.status(400).json({ error: '蓍草起卦参数有误，请重新起卦' });
+    }
     // 蓍草模式：使用前端传来的爻值，后端仅负责查表
     const yaoValues = manualYaoValues;
     const yaoLines = yaoValues.map(v => v % 2 === 1 ? 1 : 0);
@@ -387,15 +519,25 @@ app.post('/api/bazi/interpret', async (req, res) => {
  * 接收用户问题与已生成的卦象 ID，调用 Qwen AI 进行 SSE 流式解读
  */
 app.post('/api/interpret', async (req, res) => {
-  const { question, hexagramNumber } = req.body;
+  const { hexagramNumber } = req.body || {};
+  const question = normalizeQuestionInput(req.body?.question);
   const hexagram = hexagrams[hexagramNumber];
+
+  if (!question) {
+    return res.status(400).json({ error: '请输入您想要解读的问题' });
+  }
 
   if (!hexagram) {
     return res.status(400).json({ error: '卦象参数或查阅有误，无法为您解读' });
   }
 
   // 构建动爻信息文本（用于 AI 提示词）
-  const { changingPositions, changedHexagramNumber } = req.body;
+  const { changedHexagramNumber } = req.body || {};
+  const normalizedChangingPositions = normalizeChangingPositions(req.body?.changingPositions);
+  if (!normalizedChangingPositions) {
+    return res.status(400).json({ error: '动爻参数有误，无法为您解读' });
+  }
+  const changingPositions = normalizedChangingPositions;
   const yaoNames = ['初', '二', '三', '四', '五', '上'];
   let changingInfo = '';
   if (changingPositions && changingPositions.length > 0) {
@@ -412,7 +554,13 @@ app.post('/api/interpret', async (req, res) => {
 
 你的回复必须严格遵循以下格式：
 
-第一段：先用一小段短句接住用户当下的情绪，不超过60字。要像“先给一句定心话”，让用户觉得被理解、被稳住。不要解释术语，不要下绝对结论，不要使用古风腔、不要故作高深、不要恐吓用户。
+第一段：独占一行输出标记：
+[一句判断]
+然后下一行给出一句短判断，18-30个字左右。它要像“先给一个落点”：先接住一点情绪，再给用户一个方向。不要只写四五个字，不要解释术语，不要写成列表，不要下绝对结论。
+
+第二段：独占一行输出标记：
+[定心话]
+然后下一行用一小段短句接住用户当下的情绪，不超过60字。要像“先给一句定心话”，让用户觉得被理解、被稳住。不要解释术语，不要下绝对结论，不要使用古风腔、不要故作高深、不要恐吓用户。
 
 然后独占一行输出分隔标记（前后不要加任何空格、标点或其他文字）：
 [大白话]
@@ -426,15 +574,20 @@ app.post('/api/interpret', async (req, res) => {
 
 详细解释时请严格遵守：
 1. 只根据用户问题、卦象、动爻与之卦来解释，不要编造卦里没有的信息。
-2. 如果有动爻和之卦，要明确告诉用户变数在哪、事情为什么还没定型。
-3. 语气温柔、稳一点、接地气一点，像一个愿意陪用户把事情捋清楚的朋友。
-4. 可以给建议，但不要替用户做人生决定，不要说绝对会怎样。
-5. 不要使用 emoji，不要使用文言腔，不要写“吾观此卦”“此乃天意”等表达。
+2. 如果有动爻和之卦，必须在大白话里明确说清三件事：这件事为什么还没定、变化主要会出在哪、你现在更适合顺着变还是先别动。
+3. 如果有动爻和之卦，要把本卦、动爻、之卦的关系翻译成人话：本卦是现在的局面，动爻是变化点，之卦是继续变化下去后更可能走向的方向。
+4. 语气温柔、稳一点、接地气一点，像一个愿意陪用户把事情捋清楚的朋友。
+5. 可以给建议，但不要替用户做人生决定，不要说绝对会怎样。
+6. 不要使用 emoji，不要使用文言腔，不要写“吾观此卦”“此乃天意”等表达。
 
-重要：分隔标记 [大白话] 必须独占一行，前后不能有任何其他字符。`;
+重要：
+1. [一句判断]、[定心话]、[大白话] 都必须独占一行，前后不能有任何其他字符。
+2. 一句判断保持 18-30 个字，不要短到像半句话，也不要超过一行半。
+3. 定心话一定不要和一句判断重复。`;
 
   const userPrompt = `用户现在最纠结的问题是：${question}\n\n对应卦象如下：\n\n${hexagram.content}${changingInfo}\n\n请先接住用户情绪，再把这件事讲清楚。`;
   let fullAiResponse = '';
+  const requestId = createRequestId();
 
   const streamResult = await streamQwenResponse({
     res,
@@ -448,13 +601,13 @@ app.post('/api/interpret', async (req, res) => {
     },
     onUsage: (usage) => {
       if (!usage.total_tokens) return;
-      const logLine = `[${new Date().toISOString()}] Question: ${question.replace(/\n/g, ' ').substring(0, 30)} | Input: ${usage.prompt_tokens} | Output: ${usage.completion_tokens} | Total: ${usage.total_tokens}\n`;
+      const logLine = `[${new Date().toISOString()}] Request: ${requestId} | QuestionLength: ${question.length} | Input: ${usage.prompt_tokens} | Output: ${usage.completion_tokens} | Total: ${usage.total_tokens}\n`;
       fs.appendFileSync(path.join(__dirname, 'token_usage.log'), logLine);
     },
   });
 
   if (streamResult.ok) {
-    if (db) {
+    if (db && SAVE_DIVINATION_HISTORY) {
       db.run(
         `INSERT INTO divination_history (question, hexagram_number, changing_positions, changed_hexagram, ai_interpretation) VALUES (?, ?, ?, ?, ?)`,
         [question, hexagramNumber, JSON.stringify(changingPositions || []), changedHexagramNumber, fullAiResponse],

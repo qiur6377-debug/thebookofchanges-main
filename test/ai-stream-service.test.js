@@ -70,6 +70,7 @@ test('streamQwenResponse sends requests to Qwen and forwards content chunks as S
   const requestBody = JSON.parse(requestOptions.body);
   assert.equal(requestBody.model, 'qwen-plus');
   assert.deepEqual(requestBody.stream_options, { include_usage: true });
+  assert.ok(requestOptions.signal, 'Qwen requests should be abortable');
   assert.equal('thinking' in requestBody, false);
   assert.equal(res.headers['Content-Type'], 'text/event-stream');
   assert.deepEqual(seen, ['甲', '乙']);
@@ -79,6 +80,32 @@ test('streamQwenResponse sends requests to Qwen and forwards content chunks as S
     'data: [DONE]\n\n',
   ]);
   assert.equal(res.ended, true);
+});
+
+test('streamQwenResponse does not log raw upstream error bodies', async () => {
+  const res = createResponseRecorder();
+  const logged = [];
+  const fetchImpl = async () => ({
+    ok: false,
+    status: 500,
+    text: async () => 'upstream secret detail',
+  });
+  const originalConsoleError = console.error;
+  console.error = (...args) => logged.push(args.join(' '));
+
+  try {
+    await streamQwenResponse({
+      res,
+      messages: [{ role: 'user', content: 'hello' }],
+      apiKey: 'test-key',
+      fetchImpl,
+      errorPrefix: 'AI',
+    });
+  } finally {
+    console.error = originalConsoleError;
+  }
+
+  assert.equal(logged.some(line => line.includes('upstream secret detail')), false);
 });
 
 test('streamQwenResponse emits a user-safe error for failed upstream responses', async () => {

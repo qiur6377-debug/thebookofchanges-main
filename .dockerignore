@@ -1,5 +1,8 @@
 node_modules
 npm-debug.log
+*.log
+token_usage.log
+analytics_events.log
 .git
 .gitignore
 .DS_Store

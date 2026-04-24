@@ -64,3 +64,21 @@ test('rate limiter resets the bucket after the window expires', () => {
 }
 );
 
+test('rate limiter ignores untrusted x-forwarded-for by default', () => {
+  let now = 1000;
+  const limiter = createApiRateLimiter({ windowMs: 1000, max: 1, now: () => now });
+  let nextCalls = 0;
+
+  limiter({
+    ip: '127.0.0.1',
+    headers: { 'x-forwarded-for': '203.0.113.1' },
+  }, createResponse(), () => { nextCalls += 1; });
+  const second = createResponse();
+  limiter({
+    ip: '127.0.0.1',
+    headers: { 'x-forwarded-for': '203.0.113.2' },
+  }, second, () => { nextCalls += 1; });
+
+  assert.equal(nextCalls, 1);
+  assert.equal(second.statusCode, 429);
+});

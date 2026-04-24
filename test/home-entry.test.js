@@ -10,13 +10,14 @@ function read(relativePath) {
 }
 
 test('home page starts with a focused hero and secondary tools', () => {
-  const html = read('public/index.html');
+  const html = read('public/classic.html');
 
   assert.match(html, /id="home-section"[\s\S]*class="home-section active"/);
   assert.match(html, /class="hero-panel"[\s\S]*给一点方向，也给一点心安/);
   assert.match(html, /class="hero-title"[\s\S]*心里有事，就来算一下/);
   assert.match(html, /id="zhouyi-entry-btn"[\s\S]*立即算一算/);
-  assert.match(html, /id="yarrow-btn"[\s\S]*大衍筮法（古法蓍草推演）/);
+  assert.match(html, /class="ritual-entry-panel"[\s\S]*想慢一点、更有仪式感？/);
+  assert.match(html, /id="yarrow-btn"[\s\S]*试试古法起卦/);
   assert.doesNotMatch(html, /蓍草起卦（高级）/);
   assert.doesNotMatch(html, /hero-secondary-btn/);
   assert.match(html, /class="hero-fit-list"[\s\S]*感情反复、工作犹豫、关系拉扯、要不要主动、该不该推进/);
@@ -24,11 +25,13 @@ test('home page starts with a focused hero and secondary tools', () => {
   assert.doesNotMatch(html, /id="bazi-tool-entry"/);
   assert.match(html, /id="shengxiao-entry-btn"[\s\S]*关系合拍/);
   assert.match(html, /id="luohou-entry-btn"[\s\S]*挑个日子/);
-  assert.match(html, /class="method-summary"[\s\S]*问现在[\s\S]*看自己[\s\S]*选时机/);
+  assert.match(html, /class="home-soft-note"[\s\S]*先问眼前这一件事/);
+  assert.doesNotMatch(html, /class="method-summary"/);
   assert.match(html, /id="question-intro-title"[\s\S]*把心里的事说出来/);
   assert.match(html, /id="question"[\s\S]*我要不要主动联系他/);
   assert.match(html, /class="question-note"[\s\S]*像发消息一样写出来就好/);
   assert.match(html, /id="divine-btn"[\s\S]*立即算一算/);
+  assert.doesNotMatch(html, /id="yarrow-btn" class="secondary-btn" style="margin-top: 0\.8rem;"/);
   assert.match(html, /class="section-intro"[\s\S]*默认先用轻模式/);
   assert.match(html, /id="bazi-optional-panel" class="bazi-lite-panel"[\s\S]*补充更多出生信息（可选）/);
   assert.match(html, /id="bazi-minute"[\s\S]*placeholder="30"/);
@@ -44,6 +47,7 @@ test('home page starts with a focused hero and secondary tools', () => {
   assert.match(html, /id="luohou-interpret-btn"[\s\S]*帮我挑重点/);
   assert.match(html, /id="luohou-single-day-btn"[\s\S]*只查这一天/);
   assert.match(html, /id="result-home-btn"[\s\S]*返回首页/);
+  assert.match(html, /class="hexagram-display"[\s\S]*class="result-emotion-entry"[\s\S]*id="interpretation-wrapper"/);
   assert.match(html, /id="question-section"[\s\S]*class="card hidden"/);
   assert.match(html, /id="bazi-section"[\s\S]*class="card hidden"/);
   assert.match(html, /id="shengxiao-section"[\s\S]*class="card hidden"/);
@@ -51,7 +55,7 @@ test('home page starts with a focused hero and secondary tools', () => {
 });
 
 test('result pages include the first four recommendation flow points', () => {
-  const html = read('public/index.html');
+  const html = read('public/classic.html');
   const css = read('public/style.css');
 
   assert.match(html, /id="zhouyi-bazi-recommendation"[\s\S]*想再看看自己最近的底色？/);
@@ -98,6 +102,7 @@ test('front-end navigation moves between home and all workflows', () => {
   assert.match(app, /resultHomeBtn\.addEventListener\('click', \(\) => \{/);
   assert.match(app, /updateQuestionEcho\(''\)/);
   assert.match(app, /showSection\(homeSection\)/);
+  assert.match(app, /await startInterpretation\(\)/);
 });
 
 test('opening zhouyi again re-enables the quick divination button', () => {
@@ -127,7 +132,7 @@ test('front-end recommendation flow points display and navigate correctly', () =
 });
 
 test('ui polish adds guided prompts, inline feedback, structured results, and focus states', () => {
-  const html = read('public/index.html');
+  const html = read('public/classic.html');
   const css = read('public/style.css');
   const app = read('public/app.js');
 
@@ -141,7 +146,7 @@ test('ui polish adds guided prompts, inline feedback, structured results, and fo
   assert.match(html, /id="bazi-result-cards" class="structured-result-list"/);
   assert.match(html, /id="shengxiao-result-cards" class="structured-result-list"/);
   assert.match(html, /id="luohou-result-cards" class="structured-result-list"/);
-  assert.match(html, /class="raw-result-details"[\s\S]*查看原始排盘/);
+  assert.match(html, /class="raw-result-details"[\s\S]*展开看详细命盘/);
 
   assert.match(css, /button:focus-visible[\s\S]*outline: 3px solid/);
   assert.match(css, /\.form-message\[data-state="error"\]/);
@@ -171,7 +176,7 @@ test('mobile bazi result cards stay inside the viewport and wrap long lines', ()
 });
 
 test('mobile form bottom sheets are available for bazi and luohou', () => {
-  const html = read('public/index.html');
+  const html = read('public/classic.html');
   const css = read('public/style.css');
   const app = read('public/app.js');
 
@@ -203,16 +208,20 @@ test('streaming interpretation keeps a blinking cursor and follows new text', ()
   assert.match(css, /\.cursor-blink/);
   assert.match(css, /@keyframes cursorBlink/);
   assert.match(app, /function renderStreamingText\(/);
+  assert.match(app, /function shouldStickStreamingContent\(target\)/);
   assert.match(app, /class="cursor cursor-blink"/);
-  assert.match(app, /window\.scrollTo\(\{ top: document\.body\.scrollHeight, behavior: 'smooth' \}\)/);
+  assert.match(app, /const keepViewportPinned = shouldStickStreamingContent\(target\)/);
+  assert.match(app, /if \(keepViewportPinned\) \{\s*target\.scrollTop = target\.scrollHeight;\s*\}/);
+  assert.doesNotMatch(app, /window\.scrollTo\(\{ top: document\.body\.scrollHeight, behavior: 'smooth' \}\)/);
 });
 
 test('share export adds a share-only emotional quote card and prepares a focused snapshot', () => {
-  const html = read('public/index.html');
+  const html = read('public/classic.html');
   const css = read('public/style.css');
   const app = read('public/app.js');
 
   assert.match(html, /id="share-card-footer" class="share-card-footer share-only-block"/);
+  assert.match(html, /id="share-card-context" class="share-card-context"/);
   assert.match(html, /id="share-card-quote" class="share-card-quote"/);
   assert.match(html, /这一卦想对你说/);
   assert.match(html, /id="interpretation-emotion-block"/);
@@ -221,18 +230,20 @@ test('share export adds a share-only emotional quote card and prepares a focused
   assert.match(css, /\.share-only-block[\s\S]*display: none/);
   assert.match(css, /\.share-mode \.share-only-block[\s\S]*display: block !important/);
   assert.match(css, /\.share-card-footer/);
+  assert.match(css, /\.share-card-context/);
   assert.match(css, /\.share-card-quote/);
   assert.match(css, /\.share-mode #interpretation-emotion-block[\s\S]*display: none !important/);
 
   assert.match(app, /function extractShareSentence\(\)/);
   assert.match(app, /function prepareShareCard\(\)/);
   assert.match(app, /function cleanupShareCard\(\)/);
+  assert.match(app, /shareCardContext\.textContent = /);
   assert.match(app, /shareCardQuote\.textContent = /);
   assert.match(app, /心安分享图_/);
 });
 
 test('result footer share button stays readable on narrow screens', () => {
-  const html = read('public/index.html');
+  const html = read('public/classic.html');
   const css = read('public/style.css');
 
   assert.match(html, /id="share-btn" class="secondary-btn share-btn-style"[\s\S]*保存心安分享图/);
