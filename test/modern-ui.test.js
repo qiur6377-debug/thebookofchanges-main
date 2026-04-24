@@ -145,6 +145,9 @@ test('modern front-end is now the default experience and classic files are prese
   assert.match(js, /function abortActiveRequest\(/);
   assert.match(js, /function setResultActionsEnabled\(/);
   assert.match(js, /function startInterpretation\(/);
+  assert.match(js, /function renderInterpretationFailure\(/);
+  assert.match(js, /卦已经起好，但大白话解读暂时没连上/);
+  assert.match(js, /statusPill\.textContent === '正在解读'/);
   assert.match(js, /resetInterpretationBlocks\(\{ preserveJudgment: true \}\)/);
   assert.match(js, /renderInterpretationSections\(currentText, \{ allowFallback: false \}\)/);
   assert.match(js, /renderInterpretationSections\(currentText, \{ allowFallback: true \}\)/);

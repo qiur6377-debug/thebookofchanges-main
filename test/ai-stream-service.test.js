@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
 const test = require('node:test');
 
 const { streamQwenResponse } = require('../lib/ai-stream-service');
@@ -106,6 +107,34 @@ test('streamQwenResponse does not log raw upstream error bodies', async () => {
   }
 
   assert.equal(logged.some(line => line.includes('upstream secret detail')), false);
+});
+
+test('streamQwenResponse does not abort when the incoming request close event fires after upload', async () => {
+  const res = createResponseRecorder();
+  res.req = new EventEmitter();
+  let requestSignal;
+  const fetchImpl = async (_url, options) => {
+    requestSignal = options.signal;
+    res.req.emit('close');
+    await Promise.resolve();
+    assert.equal(requestSignal.aborted, false);
+    return {
+      ok: true,
+      body: createChunkedBody([
+        'data: {"choices":[{"delta":{"content":"仍然继续"}}]}\n\n',
+      ]),
+    };
+  };
+
+  await streamQwenResponse({
+    res,
+    messages: [{ role: 'user', content: 'hello' }],
+    apiKey: 'test-key',
+    fetchImpl,
+  });
+
+  assert.equal(requestSignal.aborted, false);
+  assert.equal(res.chunks.some(chunk => chunk.includes('仍然继续')), true);
 });
 
 test('streamQwenResponse emits a user-safe error for failed upstream responses', async () => {

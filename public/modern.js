@@ -723,6 +723,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function renderInterpretationFailure() {
+        if (judgmentContent.classList.contains('is-pending') || !judgmentContent.textContent.trim()) {
+            setJudgmentLoadingState(false, buildInstantJudgmentPreview());
+        }
+        renderStaticText(emotionContent, '卦已经起好，只是大白话解读暂时没连上。先别慌，这不是你的问题。');
+        renderStaticText(mainContent, '你可以稍后再试一次，或者换个更具体的问法重新问。刚才的卦象已经保留下来，可以先看本卦、动爻和之卦的提示。');
+        state.interpretationComplete = false;
+        if (shareBtn) shareBtn.disabled = true;
+        if (rephraseBtn) rephraseBtn.disabled = false;
+        if (resetBtn) resetBtn.disabled = false;
+        setStatus('卦已起好');
+        setSubmitState('立即算一算', false);
+    }
+
     async function startInterpretation(requestId, controller) {
         if (!isActiveRequest(requestId)) return;
         setStatus('正在解读');
@@ -917,13 +931,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error?.name === 'AbortError' || !isActiveRequest(requestId)) {
                 return;
             }
-            setMessage(`这次没能顺利起卦：${error.message}`);
-            setStatus('暂时失败');
-            setJudgmentLoadingState(false, '这次没有顺利展开，先别急。');
-            renderStaticText(emotionContent, '这次没有顺利跑出来，不是你的问题。');
-            renderStaticText(mainContent, '你可以稍后再试，或者换个问法，让这件事更具体一点。');
+            const failedDuringInterpretation = statusPill.textContent === '正在解读';
+            if (failedDuringInterpretation) {
+                setMessage('卦已经起好，但大白话解读暂时没连上。可以稍后再试，或换个问法重新问。');
+                renderInterpretationFailure();
+            } else {
+                setMessage(`这次没能顺利起卦：${error.message}`);
+                setStatus('暂时失败');
+                setJudgmentLoadingState(false, '这次没有顺利展开，先别急。');
+                renderStaticText(emotionContent, '这次没有顺利跑出来，不是你的问题。');
+                renderStaticText(mainContent, '你可以稍后再试，或者换个问法，让这件事更具体一点。');
+            }
             trackEvent('divine_error', {
-                stage: statusPill.textContent === '正在解读' ? 'interpret' : 'divine',
+                stage: failedDuringInterpretation ? 'interpret' : 'divine',
                 errorCode: error?.name || 'unknown_error',
             });
         } finally {
