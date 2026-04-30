@@ -85,3 +85,42 @@ test('server strictly validates divination payloads before using them', () => {
   assert.match(server, /\[6, 7, 8, 9\]\.includes\(item\)/);
   assert.match(server, /const changingPositions = normalizedChangingPositions/);
 });
+
+test('server supports guest-first auth gate with phone and wechat login', () => {
+  const server = read('server.js');
+
+  assert.match(server, /CREATE TABLE IF NOT EXISTS users/);
+  assert.match(server, /CREATE TABLE IF NOT EXISTS auth_sessions/);
+  assert.match(server, /CREATE TABLE IF NOT EXISTS phone_login_codes/);
+  assert.match(server, /CREATE TABLE IF NOT EXISTS guest_usage/);
+  assert.match(server, /function parseCookies/);
+  assert.match(server, /function getAuthContext/);
+  assert.match(server, /function ensureDivinationAccess/);
+  assert.match(server, /const AUTH_GATE_ENABLED = false/);
+  assert.match(server, /if \(!AUTH_GATE_ENABLED\) return \{ ok: true, reason: 'auth_disabled' \}/);
+  assert.match(server, /function markDivinationUsed/);
+  assert.match(server, /LOGIN_REQUIRED/);
+  assert.match(server, /app\.get\('\/api\/auth\/me'/);
+  assert.match(server, /app\.post\('\/api\/auth\/phone\/request-code'/);
+  assert.match(server, /app\.post\('\/api\/auth\/phone\/verify'/);
+  assert.match(server, /app\.get\('\/api\/auth\/wechat\/start'/);
+  assert.match(server, /app\.get\('\/api\/auth\/wechat\/callback'/);
+  assert.match(server, /app\.post\('\/api\/auth\/logout'/);
+  assert.match(server, /xinan_session/);
+  assert.match(server, /x-guest-id/);
+});
+
+test('interpretation prompt keeps Zhouyi evidence while staying readable', () => {
+  const server = read('server.js');
+
+  assert.match(server, /本卦=现在的局面/);
+  assert.match(server, /动爻=变化点/);
+  assert.match(server, /之卦=继续变化后的方向/);
+  assert.match(server, /每个小标题下面都必须按“三层写法”/);
+  assert.match(server, /第一行：用 \*\*加粗\*\* 写一句人话结论/);
+  assert.match(server, /第二行：用本卦、动爻、之卦作依据/);
+  assert.match(server, /第三行：给一个具体可执行的小动作/);
+  assert.match(server, /卦理是依据，不是正文主角/);
+  assert.match(server, /不要连续堆术语/);
+  assert.match(server, /每个小标题至少有一个 \*\*加粗重点句\*\*/);
+});

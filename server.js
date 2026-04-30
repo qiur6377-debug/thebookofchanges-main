@@ -10,6 +10,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { buildBaziInterpretationMessages, runBaziReading, runBaziReverseReading } = require('./lib/bazi-service');
 const { buildLuohouInterpretationMessages, runLuohouReading } = require('./lib/luohou-service');
 const { runShengxiaoReading } = require('./lib/shengxiao-service');
@@ -19,6 +20,12 @@ require('dotenv').config();
 
 const SAVE_DIVINATION_HISTORY = process.env.SAVE_DIVINATION_HISTORY === 'true';
 const MAX_QUESTION_LENGTH = 500;
+const SESSION_COOKIE_NAME = 'xinan_session';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PHONE_CODE_TTL_MS = 10 * 60 * 1000;
+const AUTH_SECRET = process.env.AUTH_SECRET || process.env.SESSION_SECRET || 'xinan-local-dev-secret';
+const AUTH_SUCCESS_REDIRECT = process.env.AUTH_SUCCESS_REDIRECT || '/';
+const AUTH_GATE_ENABLED = false;
 const BLOCKED_ANALYTICS_KEYS = new Set([
   'question',
   'content',
@@ -35,6 +42,14 @@ const BLOCKED_ANALYTICS_KEYS = new Set([
 
 // 如果还没安装 sqlite3，可能需要用户执行下 npm install sqlite3
 let db;
+const memoryAuthStore = {
+  nextUserId: 1,
+  users: [],
+  sessions: new Map(),
+  phoneCodes: new Map(),
+  guestUsage: new Map(),
+};
+
 try {
   const sqlite3 = require('sqlite3').verbose();
   const dbPath = path.join(__dirname, 'database.sqlite');
@@ -52,6 +67,47 @@ try {
           changed_hexagram INTEGER,
           ai_interpretation TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.run(`
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          phone TEXT UNIQUE,
+          wechat_openid TEXT UNIQUE,
+          nickname TEXT,
+          avatar_url TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.run(`
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          token_hash TEXT NOT NULL UNIQUE,
+          expires_at TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.run(`
+        CREATE TABLE IF NOT EXISTS phone_login_codes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          phone TEXT NOT NULL,
+          code_hash TEXT NOT NULL,
+          expires_at TEXT NOT NULL,
+          consumed_at TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      db.run(`
+        CREATE TABLE IF NOT EXISTS guest_usage (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          guest_id TEXT NOT NULL,
+          usage_date TEXT NOT NULL,
+          question_count INTEGER NOT NULL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(guest_id, usage_date)
         )
       `);
     }
@@ -288,6 +344,432 @@ function createRequestId() {
   return `${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
+function dbRun(sql, params = []) {
+  if (!db) return Promise.resolve({ lastID: null, changes: 0 });
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function onRun(error) {
+      if (error) reject(error);
+      else resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
+function dbGet(sql, params = []) {
+  if (!db) return Promise.resolve(null);
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (error, row) => {
+      if (error) reject(error);
+      else resolve(row || null);
+    });
+  });
+}
+
+function parseCookies(req) {
+  return String(req.headers.cookie || '')
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .reduce((cookies, part) => {
+      const index = part.indexOf('=');
+      if (index === -1) return cookies;
+      const key = decodeURIComponent(part.slice(0, index));
+      const value = decodeURIComponent(part.slice(index + 1));
+      cookies[key] = value;
+      return cookies;
+    }, {});
+}
+
+function hashSecret(value) {
+  return crypto.createHash('sha256').update(`${AUTH_SECRET}:${value}`).digest('hex');
+}
+
+function createToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function normalizePhone(value) {
+  const phone = String(value || '').replace(/\s+/g, '');
+  return /^1[3-9]\d{9}$/.test(phone) ? phone : null;
+}
+
+function createCookieValue(name, value, options = {}) {
+  const parts = [
+    `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+  ];
+  if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
+  if (options.secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+function setSessionCookie(res, token) {
+  res.setHeader('Set-Cookie', createCookieValue(SESSION_COOKIE_NAME, token, {
+    maxAge: Math.floor(SESSION_TTL_MS / 1000),
+    secure: process.env.NODE_ENV === 'production',
+  }));
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', createCookieValue(SESSION_COOKIE_NAME, '', {
+    maxAge: 0,
+    secure: process.env.NODE_ENV === 'production',
+  }));
+}
+
+function formatUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    phone: user.phone || null,
+    nickname: user.nickname || (user.phone ? `用户${String(user.phone).slice(-4)}` : '微信用户'),
+    avatarUrl: user.avatar_url || null,
+    loginType: user.phone ? 'phone' : 'wechat',
+  };
+}
+
+async function findOrCreatePhoneUser(phone) {
+  if (!db) {
+    let user = memoryAuthStore.users.find(item => item.phone === phone);
+    if (!user) {
+      user = { id: memoryAuthStore.nextUserId++, phone, nickname: `用户${phone.slice(-4)}` };
+      memoryAuthStore.users.push(user);
+    }
+    return user;
+  }
+
+  const existing = await dbGet('SELECT * FROM users WHERE phone = ?', [phone]);
+  if (existing) {
+    await dbRun('UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [existing.id]);
+    return existing;
+  }
+  const result = await dbRun('INSERT INTO users (phone, nickname) VALUES (?, ?)', [phone, `用户${phone.slice(-4)}`]);
+  return dbGet('SELECT * FROM users WHERE id = ?', [result.lastID]);
+}
+
+async function findOrCreateWechatUser(profile) {
+  const openid = String(profile?.openid || '').trim();
+  if (!openid) throw new Error('微信登录信息缺少 openid');
+
+  if (!db) {
+    let user = memoryAuthStore.users.find(item => item.wechat_openid === openid);
+    if (!user) {
+      user = {
+        id: memoryAuthStore.nextUserId++,
+        wechat_openid: openid,
+        nickname: profile.nickname || '微信用户',
+        avatar_url: profile.headimgurl || null,
+      };
+      memoryAuthStore.users.push(user);
+    }
+    return user;
+  }
+
+  const existing = await dbGet('SELECT * FROM users WHERE wechat_openid = ?', [openid]);
+  if (existing) {
+    await dbRun(
+      'UPDATE users SET nickname = COALESCE(?, nickname), avatar_url = COALESCE(?, avatar_url), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [profile.nickname || null, profile.headimgurl || null, existing.id]
+    );
+    return dbGet('SELECT * FROM users WHERE id = ?', [existing.id]);
+  }
+
+  const result = await dbRun(
+    'INSERT INTO users (wechat_openid, nickname, avatar_url) VALUES (?, ?, ?)',
+    [openid, profile.nickname || '微信用户', profile.headimgurl || null]
+  );
+  return dbGet('SELECT * FROM users WHERE id = ?', [result.lastID]);
+}
+
+async function createSession(res, user) {
+  const token = createToken();
+  const tokenHash = hashSecret(token);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+
+  if (db) {
+    await dbRun(
+      'INSERT INTO auth_sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [user.id, tokenHash, expiresAt]
+    );
+  } else {
+    memoryAuthStore.sessions.set(tokenHash, { userId: user.id, expiresAt });
+  }
+
+  setSessionCookie(res, token);
+}
+
+async function getUserBySessionToken(token) {
+  if (!token) return null;
+  const tokenHash = hashSecret(token);
+
+  if (!db) {
+    const session = memoryAuthStore.sessions.get(tokenHash);
+    if (!session || new Date(session.expiresAt).getTime() <= Date.now()) return null;
+    return memoryAuthStore.users.find(user => user.id === session.userId) || null;
+  }
+
+  const row = await dbGet(
+    `SELECT users.*
+       FROM auth_sessions
+       JOIN users ON users.id = auth_sessions.user_id
+      WHERE auth_sessions.token_hash = ?`,
+    [tokenHash]
+  );
+  if (!row) return null;
+  const session = await dbGet('SELECT expires_at FROM auth_sessions WHERE token_hash = ?', [tokenHash]);
+  if (!session || new Date(session.expires_at).getTime() <= Date.now()) return null;
+  return row;
+}
+
+function getGuestId(req) {
+  const guestId = String(req.headers['x-guest-id'] || '').trim();
+  return /^[a-zA-Z0-9_-]{12,96}$/.test(guestId) ? guestId : null;
+}
+
+async function getAuthContext(req) {
+  const cookies = parseCookies(req);
+  const user = await getUserBySessionToken(cookies[SESSION_COOKIE_NAME]);
+  return {
+    user,
+    guestId: getGuestId(req),
+  };
+}
+
+function getGuestUsageKey(guestId) {
+  return `${guestId}:lifetime`;
+}
+
+async function getGuestQuestionCount(guestId) {
+  if (!guestId) return 0;
+  if (!db) {
+    return memoryAuthStore.guestUsage.get(getGuestUsageKey(guestId)) || 0;
+  }
+  const row = await dbGet(
+    'SELECT question_count FROM guest_usage WHERE guest_id = ? AND usage_date = ?',
+    [guestId, 'lifetime']
+  );
+  return row ? Number(row.question_count) || 0 : 0;
+}
+
+async function ensureDivinationAccess(authContext) {
+  if (!AUTH_GATE_ENABLED) return { ok: true, reason: 'auth_disabled' };
+  if (authContext.user) return { ok: true, reason: 'user' };
+  if (!authContext.guestId) {
+    return { ok: false, code: 'GUEST_ID_REQUIRED', message: '请刷新页面后再试一次' };
+  }
+  const count = await getGuestQuestionCount(authContext.guestId);
+  if (count >= 1) {
+    return { ok: false, code: 'LOGIN_REQUIRED', message: '继续问，需要先登录' };
+  }
+  return { ok: true, reason: 'guest' };
+}
+
+async function markDivinationUsed(authContext) {
+  if (authContext.user || !authContext.guestId) return;
+  if (!db) {
+    const key = getGuestUsageKey(authContext.guestId);
+    memoryAuthStore.guestUsage.set(key, (memoryAuthStore.guestUsage.get(key) || 0) + 1);
+    return;
+  }
+
+  await dbRun(
+    `INSERT INTO guest_usage (guest_id, usage_date, question_count, updated_at)
+     VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+     ON CONFLICT(guest_id, usage_date)
+     DO UPDATE SET question_count = question_count + 1, updated_at = CURRENT_TIMESTAMP`,
+    [authContext.guestId, 'lifetime']
+  );
+}
+
+async function storePhoneCode(phone, code) {
+  const codeHash = hashSecret(`${phone}:${code}`);
+  const expiresAt = new Date(Date.now() + PHONE_CODE_TTL_MS).toISOString();
+
+  if (!db) {
+    memoryAuthStore.phoneCodes.set(phone, { codeHash, expiresAt, consumedAt: null });
+    return;
+  }
+
+  await dbRun(
+    'INSERT INTO phone_login_codes (phone, code_hash, expires_at) VALUES (?, ?, ?)',
+    [phone, codeHash, expiresAt]
+  );
+}
+
+async function consumePhoneCode(phone, code) {
+  const codeHash = hashSecret(`${phone}:${code}`);
+
+  if (!db) {
+    const record = memoryAuthStore.phoneCodes.get(phone);
+    if (!record || record.consumedAt || record.codeHash !== codeHash || new Date(record.expiresAt).getTime() <= Date.now()) {
+      return false;
+    }
+    record.consumedAt = new Date().toISOString();
+    return true;
+  }
+
+  const record = await dbGet(
+    `SELECT id, expires_at FROM phone_login_codes
+      WHERE phone = ? AND code_hash = ? AND consumed_at IS NULL
+      ORDER BY id DESC LIMIT 1`,
+    [phone, codeHash]
+  );
+  if (!record || new Date(record.expires_at).getTime() <= Date.now()) return false;
+  await dbRun('UPDATE phone_login_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?', [record.id]);
+  return true;
+}
+
+function canUseDevSmsMode() {
+  return process.env.AUTH_DEV_SMS === 'true';
+}
+
+async function sendSmsCode(phone, code) {
+  if (canUseDevSmsMode()) {
+    console.log(`[auth] 手机号 ${phone} 的本地测试验证码：${code}`);
+    return { sent: true, devCode: code };
+  }
+  throw new Error('短信服务未配置');
+}
+
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const authContext = await getAuthContext(req);
+    const guestQuestionCount = await getGuestQuestionCount(authContext.guestId);
+    res.json({
+      user: formatUser(authContext.user),
+      guest: {
+        questionUsed: !authContext.user && guestQuestionCount >= 1,
+      },
+    });
+  } catch (error) {
+    console.error('读取登录状态失败:', error.message);
+    res.status(500).json({ error: '登录状态暂时不可用' });
+  }
+});
+
+app.post('/api/auth/phone/request-code', async (req, res) => {
+  const phone = normalizePhone(req.body?.phone);
+  if (!phone) {
+    return res.status(400).json({ error: '请输入正确的手机号' });
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  try {
+    await storePhoneCode(phone, code);
+    const result = await sendSmsCode(phone, code);
+    res.json({
+      ok: true,
+      message: result.devCode ? `本地测试验证码：${result.devCode}` : '验证码已发送',
+      devCode: result.devCode || undefined,
+    });
+  } catch (error) {
+    res.status(503).json({ error: error.message || '验证码发送失败，请稍后再试' });
+  }
+});
+
+app.post('/api/auth/phone/verify', async (req, res) => {
+  const phone = normalizePhone(req.body?.phone);
+  const code = String(req.body?.code || '').trim();
+  if (!phone || !/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: '手机号或验证码格式不正确' });
+  }
+
+  try {
+    const valid = await consumePhoneCode(phone, code);
+    if (!valid) {
+      return res.status(400).json({ error: '验证码不正确或已过期' });
+    }
+    const user = await findOrCreatePhoneUser(phone);
+    await createSession(res, user);
+    res.json({ ok: true, user: formatUser(user) });
+  } catch (error) {
+    console.error('手机号登录失败:', error.message);
+    res.status(500).json({ error: '手机号登录失败，请稍后再试' });
+  }
+});
+
+app.get('/api/auth/wechat/start', (req, res) => {
+  const appId = process.env.WECHAT_APP_ID;
+  const redirectUri = process.env.WECHAT_REDIRECT_URI;
+  if (!appId || !redirectUri) {
+    return res.status(503).json({ error: '微信登录暂未配置，请先使用手机号登录' });
+  }
+
+  const state = createToken().slice(0, 16);
+  const scope = process.env.WECHAT_OAUTH_SCOPE || 'snsapi_userinfo';
+  const url = new URL('https://open.weixin.qq.com/connect/oauth2/authorize');
+  url.searchParams.set('appid', appId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', scope);
+  url.searchParams.set('state', state);
+  const loginUrl = `${url.toString()}#wechat_redirect`;
+  if (req.query.mode === 'json') {
+    return res.json({ url: loginUrl });
+  }
+  res.redirect(loginUrl);
+});
+
+app.get('/api/auth/wechat/callback', async (req, res) => {
+  const { code } = req.query || {};
+  const appId = process.env.WECHAT_APP_ID;
+  const appSecret = process.env.WECHAT_APP_SECRET;
+
+  if (!code || !appId || !appSecret) {
+    return res.status(400).send('微信登录配置不完整，请返回后使用手机号登录');
+  }
+
+  try {
+    const tokenUrl = new URL('https://api.weixin.qq.com/sns/oauth2/access_token');
+    tokenUrl.searchParams.set('appid', appId);
+    tokenUrl.searchParams.set('secret', appSecret);
+    tokenUrl.searchParams.set('code', String(code));
+    tokenUrl.searchParams.set('grant_type', 'authorization_code');
+
+    const tokenResponse = await fetch(tokenUrl);
+    const tokenData = await tokenResponse.json();
+    if (!tokenData.openid || !tokenData.access_token) {
+      throw new Error(tokenData.errmsg || '微信授权失败');
+    }
+
+    const profileUrl = new URL('https://api.weixin.qq.com/sns/userinfo');
+    profileUrl.searchParams.set('access_token', tokenData.access_token);
+    profileUrl.searchParams.set('openid', tokenData.openid);
+    profileUrl.searchParams.set('lang', 'zh_CN');
+    const profileResponse = await fetch(profileUrl);
+    const profile = await profileResponse.json();
+
+    const user = await findOrCreateWechatUser({
+      openid: tokenData.openid,
+      nickname: profile.nickname,
+      headimgurl: profile.headimgurl,
+    });
+    await createSession(res, user);
+    res.redirect(AUTH_SUCCESS_REDIRECT);
+  } catch (error) {
+    console.error('微信登录失败:', error.message);
+    res.status(500).send('微信登录失败，请返回后使用手机号登录');
+  }
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies[SESSION_COOKIE_NAME];
+  if (token) {
+    const tokenHash = hashSecret(token);
+    if (db) {
+      await dbRun('DELETE FROM auth_sessions WHERE token_hash = ?', [tokenHash]).catch(error => {
+        console.error('退出登录清理会话失败:', error.message);
+      });
+    } else {
+      memoryAuthStore.sessions.delete(tokenHash);
+    }
+  }
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
 /**
  * POST /api/track
  * 轻量产品埋点：只记录行为与长度等元数据，不记录用户提问原文。
@@ -330,12 +812,27 @@ app.post('/api/track', (req, res) => {
  *   1. 快速模式：仅传 question，后端算法起卦
  *   2. 蓍草模式：同时传 yaoValues（前端 Canvas 交互生成），后端直接查表
  */
-app.post('/api/divine', (req, res) => {
+app.post('/api/divine', async (req, res) => {
   const { yaoValues: manualYaoValues } = req.body || {};
   const question = normalizeQuestionInput(req.body?.question);
 
   if (!question) {
     return res.status(400).json({ error: '请输入您想要占卜的问题' });
+  }
+
+  let authContext;
+  try {
+    authContext = await getAuthContext(req);
+    const access = await ensureDivinationAccess(authContext);
+    if (!access.ok) {
+      return res.status(access.code === 'LOGIN_REQUIRED' ? 401 : 400).json({
+        code: access.code,
+        error: access.message,
+      });
+    }
+  } catch (error) {
+    console.error('校验问卦权限失败:', error.message);
+    return res.status(500).json({ error: '登录状态暂时不可用，请稍后再试' });
   }
 
   let result;
@@ -396,6 +893,12 @@ app.post('/api/divine', (req, res) => {
 
   if (!hexagram) {
     return res.status(500).json({ error: '起卦失败，请重试' });
+  }
+
+  try {
+    await markDivinationUsed(authContext);
+  } catch (error) {
+    console.error('记录问卦次数失败:', error.message);
   }
 
   // 构建之卦信息
@@ -556,16 +1059,16 @@ app.post('/api/interpret', async (req, res) => {
 
 第一段：独占一行输出标记：
 [一句判断]
-然后下一行给出一句短判断，18-30个字左右。它要像“先给一个落点”：先接住一点情绪，再给用户一个方向。不要只写四五个字，不要解释术语，不要写成列表，不要下绝对结论。
+然后下一行给出一句短判断，14-26个字左右，必须是完整句并以句号、问号或感叹号结尾。它要像“先给一个落点”：先接住一点情绪，再给用户一个方向。不要只写四五个字，不要解释术语，不要写成列表，不要下绝对结论。
 
 第二段：独占一行输出标记：
 [定心话]
-然后下一行用一小段短句接住用户当下的情绪，不超过60字。要像“先给一句定心话”，让用户觉得被理解、被稳住。不要解释术语，不要下绝对结论，不要使用古风腔、不要故作高深、不要恐吓用户。
+然后下一行用一句 24-55 字的短句接住用户当下的情绪，必须是完整句并以句号、问号或感叹号结尾。它会作为“落点”的第二层解释，也会进入分享卡，所以要温柔、具体、像朋友在旁边帮用户稳住。不要解释术语，不要下绝对结论，不要使用古风腔、不要故作高深、不要恐吓用户。
 
 然后独占一行输出分隔标记（前后不要加任何空格、标点或其他文字）：
 [大白话]
 
-第二段：用年轻人能看懂的大白话详细解释，必须严格包含以下五个小标题，顺序不能改：
+第三段：用年轻人能看懂的大白话详细解释，必须严格包含以下五个小标题，顺序不能改：
 你现在卡在哪里：
 这件事的势头：
 你最该注意：
@@ -573,17 +1076,23 @@ app.post('/api/interpret', async (req, res) => {
 给你一句话：
 
 详细解释时请严格遵守：
-1. 只根据用户问题、卦象、动爻与之卦来解释，不要编造卦里没有的信息。
-2. 如果有动爻和之卦，必须在大白话里明确说清三件事：这件事为什么还没定、变化主要会出在哪、你现在更适合顺着变还是先别动。
-3. 如果有动爻和之卦，要把本卦、动爻、之卦的关系翻译成人话：本卦是现在的局面，动爻是变化点，之卦是继续变化下去后更可能走向的方向。
-4. 语气温柔、稳一点、接地气一点，像一个愿意陪用户把事情捋清楚的朋友。
-5. 可以给建议，但不要替用户做人生决定，不要说绝对会怎样。
-6. 不要使用 emoji，不要使用文言腔，不要写“吾观此卦”“此乃天意”等表达。
+1. 只根据用户问题、卦象、动爻与之卦来解释，不要编造卦里没有的信息。卦理是依据，不是正文主角。
+2. 每个小标题下面都必须按“三层写法”：
+   第一行：用 **加粗** 写一句人话结论，先说用户眼下该怎么理解这件事。
+   第二行：用本卦、动爻、之卦作依据。必须说清：本卦=现在的局面，动爻=变化点，之卦=继续变化后的方向；也就是本卦是现在的局面，动爻是变化点，之卦是继续变化下去后更可能走向的方向。但术语后必须马上翻译成人话。
+   第三行：给一个具体可执行的小动作、观察点或下一步。
+3. 如果有动爻和之卦，必须在大白话里明确说清三件事：这件事为什么还没定、变化主要会出在哪、你现在更适合顺着变还是先别动。
+4. 本卦、动爻、之卦必须出现，但只能作为判断依据，不要连续堆术语。不要写成“无妄卦本意是……”这种教材腔，要写成“本卦『无妄』放成人话，就是……”
+5. 每个小标题控制 90-150 字，分成 2-3 个短段，手机上要好读；每个小标题至少有一个 **加粗重点句**。
+6. “给你一句话：”只输出一句适合分享的完整短句，不要再解释卦理。
+7. 语气温柔、稳一点、接地气一点，像一个愿意陪用户把事情捋清楚的朋友。
+8. 可以给建议，但不要替用户做人生决定，不要说绝对会怎样。
+9. 不要使用 emoji，不要使用文言腔，不要写“吾观此卦”“此乃天意”等表达。
 
 重要：
 1. [一句判断]、[定心话]、[大白话] 都必须独占一行，前后不能有任何其他字符。
-2. 一句判断保持 18-30 个字，不要短到像半句话，也不要超过一行半。
-3. 定心话一定不要和一句判断重复。`;
+2. 一句判断保持 14-26 个字，必须完整，不要短到像半句话，也不要超过一行半。
+3. 定心话一定不要和一句判断重复，要补充“为什么可以先这样看”。`;
 
   const userPrompt = `用户现在最纠结的问题是：${question}\n\n对应卦象如下：\n\n${hexagram.content}${changingInfo}\n\n请先接住用户情绪，再把这件事讲清楚。`;
   let fullAiResponse = '';

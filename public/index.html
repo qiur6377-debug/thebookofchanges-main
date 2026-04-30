@@ -34,20 +34,14 @@
                     <div class="modern-intro-actions">
                         <button id="modern-enter-btn" class="modern-primary-btn" type="button">开始问一件事</button>
                         <p class="modern-intro-note">感情里反复 · 工作上犹疑 · 关系里的拉扯 · 要不要主动 · 该不该推进</p>
-                        <p class="modern-intro-reminder">只问眼前最卡住的一件事，会更容易得到有用的回答。</p>
                     </div>
                 </div>
 
                 <aside class="modern-intro-aside">
                     <div class="modern-aside-card">
-                        <span class="modern-aside-index">01</span>
-                        <p class="modern-aside-title">今晚适合问的，不是所有事。</p>
-                        <p class="modern-aside-text">只问眼前最卡住你的那一件。问题越真，卦意越容易落到你心里。</p>
-                    </div>
-
-                    <div class="modern-aside-quote">
-                        <span class="modern-aside-quote-mark">“</span>
-                        <p>先让自己安静一点，再看这件事会往哪边流。</p>
+                        <span class="modern-aside-index">只问一件事</span>
+                        <p class="modern-aside-title">先把眼前最卡住的那一件放下来。</p>
+                        <p class="modern-aside-text">不用讲完整人生，也不用一次问很多。问题越具体，答案越容易落到你心里。</p>
                     </div>
                 </aside>
             </div>
@@ -73,37 +67,62 @@
                     </div>
                     <p class="modern-chip-help">不会问也没关系，点一个最像你现在状态的句子，再自己改两句就行。</p>
 
-                    <div id="modern-question-guide" class="modern-question-guide" aria-live="polite">
+                    <div id="modern-question-guide" class="modern-question-guide" aria-live="polite" hidden>
                         先写这件事本身，再补一句你最担心什么，会更容易解。
                     </div>
 
-                    <section id="modern-question-coach" class="modern-question-coach" aria-labelledby="modern-question-coach-title">
+                    <section id="modern-question-coach" class="modern-question-coach" aria-labelledby="modern-question-coach-title" hidden>
                         <div class="modern-question-coach-copy">
-                            <h3 id="modern-question-coach-title" class="modern-question-coach-title">帮我把问题问清楚</h3>
-                            <p id="modern-question-coach-status" class="modern-question-coach-status">先把事情写出来，我会提醒你还差哪一句。</p>
+                            <h3 id="modern-question-coach-title" class="modern-question-coach-title">我帮你把问题问清楚</h3>
+                            <p id="modern-question-coach-status" class="modern-question-coach-status">先把事情写出来，我会帮你整理成一句更适合问的话。</p>
                         </div>
-                        <div class="modern-coach-actions" aria-label="补全提问要素">
-                            <button type="button" class="modern-coach-pill" data-coach-field="worry">补一句：我担心的是</button>
-                            <button type="button" class="modern-coach-pill" data-coach-field="direction">补一句：我最想知道的是</button>
-                            <button type="button" class="modern-coach-pill" data-coach-field="oneThing">收成一件事来问</button>
+                        <div class="modern-coach-heard" aria-label="问题整理">
+                            <div class="modern-coach-heard-row">
+                                <span>我听到的是</span>
+                                <strong id="modern-coach-heard-event">还没写下具体事情</strong>
+                            </div>
+                            <div class="modern-coach-heard-row">
+                                <span>你可能担心</span>
+                                <strong id="modern-coach-heard-worry">还可以补一句你最担心什么</strong>
+                            </div>
+                            <div class="modern-coach-heard-row">
+                                <span>这一卦适合问</span>
+                                <strong id="modern-coach-heard-direction">要不要、该不该、会不会、往哪边走</strong>
+                            </div>
+                        </div>
+                        <div class="modern-coach-suggestion" aria-live="polite">
+                            <span>这一卦可以这样问</span>
+                            <p id="modern-coach-suggested-question">等你写下第一句，我会帮你收成一个更好问的问题。</p>
+                        </div>
+                        <div class="modern-coach-actions" aria-label="整理提问">
+                            <button type="button" class="modern-coach-pill" data-coach-field="useSuggestion">就这样问</button>
+                            <button type="button" class="modern-coach-pill" data-coach-field="rewrite">帮我整理成一句话</button>
+                            <button type="button" class="modern-coach-pill" data-coach-field="specific">让我问得更具体</button>
                         </div>
                     </section>
 
-                    <section id="modern-recent-questions" class="modern-recent-questions" aria-labelledby="modern-recent-title">
-                        <div class="modern-recent-head">
+                    <details id="modern-recent-questions" class="modern-recent-questions" hidden>
+                        <summary class="modern-recent-head">
                             <h3 id="modern-recent-title" class="modern-recent-title">最近萦在心上的几件事</h3>
                             <button id="modern-recent-clear" class="modern-recent-clear" type="button" hidden>清空</button>
                             <p id="modern-recent-empty" class="modern-recent-empty">等你问过一次，这里会轻轻留下一点线索。</p>
-                        </div>
+                        </summary>
                         <div id="modern-recent-list" class="modern-recent-list" aria-live="polite"></div>
-                    </section>
+                    </details>
+
+                    <div id="modern-message" class="modern-message" role="alert" aria-live="polite"></div>
+
+                    <div class="modern-composer-actions">
+                        <button id="modern-submit" class="modern-primary-btn" type="button">立即算一算</button>
+                    </div>
 
                     <details id="modern-question-helper" class="modern-tips">
                         <summary>
-                            <span>不知道怎么写？打开提问助手</span>
-                            <span class="modern-tips-summary-hint">三步就够</span>
+                            <span>好问题通常包含什么？</span>
+                            <span class="modern-tips-summary-hint">轻轻看一眼</span>
                         </summary>
                         <div class="modern-helper-panel">
+                            <p class="modern-helper-lead">这不是考试，不用写得很完整。只要有这三层，解读通常会更贴近你。</p>
                             <ol class="modern-tips-list">
                                 <li><strong>这件事是什么</strong>：先写清你现在到底卡在哪件事。</li>
                                 <li><strong>你最担心什么</strong>：把你最怕面对的那一面说出来。</li>
@@ -117,11 +136,6 @@
                         </div>
                     </details>
 
-                    <div id="modern-message" class="modern-message" role="alert" aria-live="polite"></div>
-
-                    <div class="modern-composer-actions">
-                        <button id="modern-submit" class="modern-primary-btn" type="button">立即算一算</button>
-                    </div>
                 </div>
             </div>
         </section>
@@ -139,7 +153,22 @@
 
             <section class="modern-judgment-card">
                 <span class="modern-surface-kicker">先给你一个落点</span>
+                <ol id="modern-judgment-progress" class="modern-judgment-progress" aria-label="落点生成进度">
+                    <li class="modern-judgment-step is-active" data-judgment-step="cast">
+                        <span class="modern-judgment-step-index">01</span>
+                        <span class="modern-judgment-step-copy">看清现在的局面</span>
+                    </li>
+                    <li class="modern-judgment-step" data-judgment-step="translate">
+                        <span class="modern-judgment-step-index">02</span>
+                        <span class="modern-judgment-step-copy">找到变化点</span>
+                    </li>
+                    <li class="modern-judgment-step" data-judgment-step="settle">
+                        <span class="modern-judgment-step-index">03</span>
+                        <span class="modern-judgment-step-copy">收成一句提醒</span>
+                    </li>
+                </ol>
                 <p id="modern-judgment-content" class="modern-judgment-text is-pending">正在提炼这一卦的落点</p>
+                <p id="modern-judgment-support" class="modern-judgment-support" hidden>先等这一卦慢慢显出来。</p>
             </section>
 
             <section class="modern-reading-flow">
@@ -177,8 +206,9 @@
             <details id="modern-changed-shell" class="modern-changed-shell" hidden>
                 <summary id="modern-changed-summary" class="modern-changed-summary">
                     <span class="modern-changed-summary-copy">
-                        <span class="modern-changed-summary-title">本卦看现在，动爻看变化点，之卦看接下来可能的走势</span>
-                        <span class="modern-changed-summary-hint">点开看看这件事接下来可能怎么走</span>
+                        <span class="modern-changed-summary-title">这卦有变化点，可以继续问这一层</span>
+                        <span class="modern-changed-summary-hint">本卦看现在，动爻看变化点，之卦看接下来可能的走势</span>
+                        <span class="modern-changed-summary-cta">点开追问动爻 ↓</span>
                     </span>
                     <span class="modern-changed-summary-icon" aria-hidden="true">⌄</span>
                 </summary>
@@ -206,12 +236,12 @@
                             <h3 id="modern-changed-title" class="modern-changed-title">之卦会出现在这里</h3>
                         </div>
                         <p class="modern-changed-note">先别把它理解成第二个答案，它更像是这件事继续变化下去后，可能显出来的方向。</p>
-                        <div class="modern-changed-search">
-                            <p id="modern-changed-search-help" class="modern-changed-search-help">想自己查的话，这里会给你一个能直接搜索的关键词。</p>
-                            <div class="modern-changed-search-actions">
-                                <code id="modern-changed-search-query" class="modern-changed-search-query">第五卦 需卦 原文</code>
-                                <button id="modern-changed-search-copy" class="modern-inline-btn" type="button">复制搜索词</button>
-                                <a id="modern-changed-search-link" class="modern-inline-link" href="https://www.baidu.com" target="_blank" rel="noreferrer">去搜一下</a>
+                        <div id="modern-changed-followup" class="modern-changed-followup">
+                            <p id="modern-changed-followup-copy" class="modern-changed-followup-copy">不用自己查原文。这里的动爻就是这件事最容易变化的地方，你可以直接顺着它继续问。</p>
+                            <div class="modern-changed-followup-actions" aria-label="继续追问这个变化">
+                                <button class="modern-changed-followup-btn" type="button" data-changed-followup="meaning">动爻在提醒我看什么</button>
+                                <button class="modern-changed-followup-btn" type="button" data-changed-followup="move">顺着变还是先稳住</button>
+                                <button class="modern-changed-followup-btn" type="button" data-changed-followup="attention">这个变化点要注意什么</button>
                             </div>
                         </div>
                         <div id="modern-changed-lines" class="modern-lines modern-lines-compact"></div>
@@ -220,11 +250,18 @@
             </details>
 
             <section id="modern-share-card" class="modern-share-card" aria-hidden="true">
-                <span class="modern-share-eyebrow">心安一下 · 今日这一卦</span>
-                <p id="modern-share-context" class="modern-share-context">关于你现在最放不下的这件事</p>
-                <p id="modern-share-judgment" class="modern-share-judgment">先把心放稳一点。</p>
-                <p id="modern-share-quote" class="modern-share-quote">答案会慢慢清楚。</p>
-                <p class="modern-share-signoff">不是替你决定，只是陪你看清一点</p>
+                <div class="modern-share-top">
+                    <span class="modern-share-eyebrow">这一卦想对你说</span>
+                    <p id="modern-share-context" class="modern-share-context">关于你现在最放不下的这件事</p>
+                </div>
+                <div class="modern-share-body">
+                    <p id="modern-share-judgment" class="modern-share-judgment">先把心放稳一点。</p>
+                    <p id="modern-share-quote" class="modern-share-quote">答案会慢慢清楚。</p>
+                </div>
+                <div class="modern-share-signoff-wrap">
+                    <p class="modern-share-signoff">不是替你决定，只是陪你看清一点</p>
+                    <div class="modern-share-stamp">心安<br>一下</div>
+                </div>
             </section>
 
             <section id="modern-followup-panel" class="modern-followup-panel">
@@ -237,6 +274,17 @@
                 </div>
             </section>
 
+            <section id="modern-followup-composer" class="modern-followup-composer" hidden>
+                <span class="modern-surface-kicker">接着这一卦继续问</span>
+                <p class="modern-followup-composer-copy">我先帮你收成一句追问。你可以直接继续，也可以改两三个字，让它更贴近你。</p>
+                <label class="modern-followup-question-label" for="modern-followup-question">这一层想继续看的问题</label>
+                <textarea id="modern-followup-question" class="modern-followup-question" rows="3"></textarea>
+                <div class="modern-followup-composer-actions">
+                    <button id="modern-followup-confirm" class="modern-primary-btn" type="button">继续看这一层</button>
+                    <button id="modern-followup-cancel" class="modern-secondary-btn" type="button">取消</button>
+                </div>
+            </section>
+
             <div class="modern-result-actions">
                 <button id="modern-share" class="modern-primary-btn" type="button">保存心安卡片</button>
                 <button id="modern-rephrase" class="modern-secondary-btn" type="button">换个问法再问</button>
@@ -244,6 +292,34 @@
             </div>
         </section>
     </main>
+
+    <div id="modern-auth-modal" class="modern-auth-modal" hidden role="dialog" aria-modal="true" aria-labelledby="modern-auth-title">
+        <div class="modern-auth-backdrop" data-auth-close></div>
+        <section class="modern-auth-card">
+            <button id="modern-auth-close" class="modern-auth-close" type="button" aria-label="关闭登录弹窗" data-auth-close>×</button>
+            <span class="modern-surface-kicker">继续问，需要先登录</span>
+            <h2 id="modern-auth-title" class="modern-auth-title">这一卦已经给你免费体验了。</h2>
+            <p class="modern-auth-copy">登录后可以继续追问、换个问法、保存你关心的事。现在先支持微信和手机号两种方式。</p>
+
+            <div class="modern-auth-methods">
+                <button id="modern-wechat-login" class="modern-auth-wechat" type="button">微信登录</button>
+
+                <div class="modern-auth-divider"><span>或用手机号</span></div>
+
+                <label class="modern-auth-label" for="modern-phone-input">手机号</label>
+                <div class="modern-auth-phone-row">
+                    <input id="modern-phone-input" class="modern-auth-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="请输入手机号">
+                    <button id="modern-send-code" class="modern-auth-code-btn" type="button">获取验证码</button>
+                </div>
+
+                <label class="modern-auth-label" for="modern-code-input">验证码</label>
+                <input id="modern-code-input" class="modern-auth-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位验证码">
+
+                <button id="modern-verify-code" class="modern-primary-btn modern-auth-submit" type="button">手机号登录</button>
+                <p id="modern-auth-message" class="modern-auth-message" role="status" aria-live="polite"></p>
+            </div>
+        </section>
+    </div>
 
     <footer class="modern-footer">
         <a class="modern-footer-link" href="/classic.html">想看完整旧版功能，可前往存档页</a>
