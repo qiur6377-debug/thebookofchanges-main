@@ -10,20 +10,23 @@ function read(relativePath) {
 }
 
 test('zhouyi interpretation prompt focuses on emotional support and actionable clarity', () => {
-  const server = read('server.js');
+  const prompt = read('prompts/zhouyi-interpretation.js');
 
-  assert.match(server, /\[一句判断\]/);
-  assert.match(server, /\[定心话\]/);
-  assert.match(server, /\[大白话\]/);
-  assert.match(server, /不要使用古风腔、不要故作高深、不要恐吓用户/);
-  assert.match(server, /给用户一点方向感和一点安定感/);
-  assert.match(server, /先接住一点情绪，再给用户一个方向/);
-  assert.match(server, /不要短到像半句话/);
-  assert.match(server, /这件事为什么还没定、变化主要会出在哪、你现在更适合顺着变还是先别动/);
-  assert.match(server, /本卦是现在的局面，动爻是变化点，之卦是继续变化下去后更可能走向的方向/);
-  assert.match(server, /你现在卡在哪里：/);
-  assert.match(server, /你可以怎么做：/);
-  assert.match(server, /给你一句话：/);
+  assert.match(prompt, /\[一句判断\]/);
+  assert.match(prompt, /\[定心话\]/);
+  assert.match(prompt, /\[大白话\]/);
+  assert.match(prompt, /不要使用古风腔、不要故作高深、不要恐吓用户/);
+  assert.match(prompt, /给用户一点方向感和一点安定感/);
+  assert.match(prompt, /先接住一点情绪，再给用户一个方向/);
+  assert.match(prompt, /不要短到像半句话/);
+  assert.match(prompt, /这件事为什么还没定、变化主要会出在哪、你现在更适合顺着变还是先别动/);
+  assert.match(prompt, /本卦是现在的局面，动爻是变化点，之卦是继续变化下去后更可能走向的方向/);
+  assert.match(prompt, /你现在卡在哪里：/);
+  assert.match(prompt, /现在可以先怎样看：/);
+  assert.match(prompt, /给你一句话：/);
+  assert.match(prompt, /不要给用户布置作业/);
+  assert.match(prompt, /不要在每个小标题结尾追加反问句、打卡任务、模板句或运营式指导/);
+  assert.doesNotMatch(prompt, /第三行：给一个具体可执行的小动作/);
 });
 
 test('bazi and luohou prompts also shift from tool tone to陪伴式解释', () => {

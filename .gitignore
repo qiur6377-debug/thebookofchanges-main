@@ -6,6 +6,7 @@ npm-debug.log
 .vitepress/cache
 token_usage.log
 analytics_events.log
+analytics-dashboard.html
 .openclaw/
 design-references/
 memory/

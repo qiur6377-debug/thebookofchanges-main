@@ -70,6 +70,9 @@ test('server keeps analytics and token logs free of user question text', () => {
   const server = read('server.js');
 
   assert.match(server, /BLOCKED_ANALYTICS_KEYS/);
+  assert.match(server, /SAFE_ANALYTICS_KEYS/);
+  assert.match(server, /questionLength/);
+  assert.match(server, /questionSource/);
   assert.match(server, /sanitizeAnalyticsPayload/);
   assert.match(server, /requestId/);
   assert.doesNotMatch(server, /Question: \$\{question/);
@@ -112,15 +115,24 @@ test('server supports guest-first auth gate with phone and wechat login', () => 
 
 test('interpretation prompt keeps Zhouyi evidence while staying readable', () => {
   const server = read('server.js');
+  const prompt = read('prompts/zhouyi-interpretation.js');
 
-  assert.match(server, /本卦=现在的局面/);
-  assert.match(server, /动爻=变化点/);
-  assert.match(server, /之卦=继续变化后的方向/);
-  assert.match(server, /每个小标题下面都必须按“三层写法”/);
-  assert.match(server, /第一行：用 \*\*加粗\*\* 写一句人话结论/);
-  assert.match(server, /第二行：用本卦、动爻、之卦作依据/);
-  assert.match(server, /第三行：给一个具体可执行的小动作/);
-  assert.match(server, /卦理是依据，不是正文主角/);
-  assert.match(server, /不要连续堆术语/);
-  assert.match(server, /每个小标题至少有一个 \*\*加粗重点句\*\*/);
+  assert.match(server, /buildZhouyiInterpretationMessages/);
+  assert.match(prompt, /本卦=现在的局面/);
+  assert.match(prompt, /动爻=变化点/);
+  assert.match(prompt, /之卦=继续变化后的方向/);
+  assert.match(prompt, /每个小标题下面都必须按“三层写法”/);
+  assert.match(prompt, /第一行：用 \*\*加粗\*\* 写一句人话结论/);
+  assert.match(prompt, /第二行：用本卦、动爻、之卦作依据/);
+  assert.match(prompt, /现在可以先怎样看：/);
+  assert.match(prompt, /不要给用户布置作业/);
+  assert.doesNotMatch(prompt, /第三行：给一个具体可执行的小动作/);
+  assert.match(prompt, /用户补充的背景信息/);
+  assert.match(prompt, /如果用户补充了背景/);
+  assert.match(prompt, /卦理是依据，不是正文主角/);
+  assert.match(prompt, /不要凭空加入用户没说过的人物、关系、动作或商业目标/);
+  assert.match(prompt, /用户没说“拉人”“找人”“合作方”“团队”“对象”/);
+  assert.match(prompt, /不要为了显得具体而替用户补剧情/);
+  assert.match(prompt, /不要连续堆术语/);
+  assert.match(prompt, /每个小标题至少有一个 \*\*加粗重点句\*\*/);
 });

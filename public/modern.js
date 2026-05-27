@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const ModernCore = window.XinanModernCore;
+    if (!ModernCore) {
+        console.error('modern-core.js 未加载，现代版核心逻辑不可用。');
+        return;
+    }
     const body = document.body;
     const enterBtn = document.getElementById('modern-enter-btn');
     const composerSection = document.getElementById('modern-composer-section');
@@ -9,6 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const shareBtn = document.getElementById('modern-share');
     const messageEl = document.getElementById('modern-message');
     const resultShell = document.getElementById('modern-result-shell');
+    const understandingLayer = document.getElementById('modern-understanding-layer');
+    const understandingHeard = document.getElementById('modern-understanding-heard');
+    const understandingStuck = document.getElementById('modern-understanding-stuck');
+    const understandingCalm = document.getElementById('modern-understanding-calm');
     const statusPill = document.getElementById('modern-status-pill');
     const questionEcho = document.getElementById('modern-question-echo');
     const judgmentCard = document.querySelector('.modern-judgment-card');
@@ -21,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const changingWarning = document.getElementById('modern-changing-warning');
     const changedShell = document.getElementById('modern-changed-shell');
     const changedSummary = document.getElementById('modern-changed-summary');
+    const changedDirectFollowup = document.getElementById('modern-changed-direct-followup');
     const changedSummaryTitle = changedSummary.querySelector('.modern-changed-summary-title');
     const changedSummaryHint = changedSummary.querySelector('.modern-changed-summary-hint');
     const changedTitle = document.getElementById('modern-changed-title');
@@ -37,7 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const shareJudgment = document.getElementById('modern-share-judgment');
     const shareQuote = document.getElementById('modern-share-quote');
     const promptChips = document.querySelectorAll('.modern-chip');
-    const questionGuide = document.getElementById('modern-question-guide');
+    const intentConfirm = document.getElementById('modern-intent-confirm');
+    const intentConfirmText = document.getElementById('modern-intent-confirm-text');
     const questionCoach = document.getElementById('modern-question-coach');
     const questionCoachStatus = document.getElementById('modern-question-coach-status');
     const questionCoachHeardEvent = document.getElementById('modern-coach-heard-event');
@@ -45,6 +56,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const questionCoachHeardDirection = document.getElementById('modern-coach-heard-direction');
     const questionCoachSuggested = document.getElementById('modern-coach-suggested-question');
     const questionCoachPills = document.querySelectorAll('.modern-coach-pill');
+    const contextPrompt = document.getElementById('modern-context-prompt');
+    const contextPromptText = document.getElementById('modern-context-prompt-text');
+    const contextToggle = document.getElementById('modern-context-toggle');
+    const contextCard = document.getElementById('modern-context-card');
+    const contextScene = document.getElementById('modern-context-scene');
+    const contextCopy = document.getElementById('modern-context-copy');
+    const contextOptions = document.getElementById('modern-context-options');
+    const contextWorryOptions = document.getElementById('modern-context-worry-options');
+    const contextFeedback = document.getElementById('modern-context-feedback');
+    const contextSituationNote = document.getElementById('modern-context-situation-note');
+    const contextWorryNote = document.getElementById('modern-context-worry-note');
+    const contextReview = document.getElementById('modern-context-review');
+    const contextReviewText = document.getElementById('modern-context-review-text');
+    const contextReviewEdit = document.getElementById('modern-context-review-edit');
+    const contextReviewConfirm = document.getElementById('modern-context-review-confirm');
+    const contextSummary = document.getElementById('modern-context-summary');
+    const contextSummaryText = document.getElementById('modern-context-summary-text');
     const questionHelper = document.getElementById('modern-question-helper');
     const helperTemplates = document.querySelectorAll('.modern-helper-template');
     const followupButtons = document.querySelectorAll('.modern-followup-btn');
@@ -52,6 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const followupQuestion = document.getElementById('modern-followup-question');
     const followupConfirm = document.getElementById('modern-followup-confirm');
     const followupCancel = document.getElementById('modern-followup-cancel');
+    const followupHistory = document.getElementById('modern-followup-history');
+    const followupHistoryList = document.getElementById('modern-followup-history-list');
     const authModal = document.getElementById('modern-auth-modal');
     const authCloseButtons = document.querySelectorAll('[data-auth-close]');
     const wechatLoginBtn = document.getElementById('modern-wechat-login');
@@ -69,9 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const GUEST_ID_KEY = 'xinan_guest_id';
     const GUEST_QUESTION_USED_KEY = 'xinan_guest_question_used';
     const AUTH_GATE_ENABLED = false;
-    const BLOCKED_ANALYTICS_KEYS = new Set(['question', 'content', 'text', 'message', 'email', 'phone', 'name', 'token', 'key', 'password', 'secret']);
-    const SHORT_INTENT_PATTERN = /(辞职|离职|跳槽|分手|复合|表白|联系|合作|接offer|offer|转行|搬家|创业|发视频|投稿|报价|续约|面试|接不接|去不去|买不买|卖不卖|要不要)/;
-    const WEAK_JUDGMENT_PATTERN = /(这一卦|本卦|变卦|之卦|卦象|动爻|爻|说明|显示|阶段|状态|第[一二三四五六七八九十百零〇0-9]+卦)/;
 
     const state = {
         question: '',
@@ -91,6 +118,16 @@ document.addEventListener('DOMContentLoaded', () => {
             guestQuestionUsed: false,
         },
         pendingFollowup: null,
+        contextSelection: '',
+        contextWorry: '',
+        contextPanelOpen: true,
+        contextPanelDismissed: false,
+        contextConfirming: false,
+        contextConfirmed: false,
+        contextReviewVisible: false,
+        contextReviewSummary: '',
+        coachOpen: false,
+        backgroundContext: null,
     };
     let pendingAuthAction = null;
 
@@ -108,25 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function sanitizeAnalyticsPayload(payload = {}) {
-        const safePayload = {};
-        Object.entries(payload).slice(0, 18).forEach(([key, value]) => {
-            if (!/^[a-zA-Z0-9_]+$/.test(key)) return;
-            const normalizedKey = key.toLowerCase();
-            if (BLOCKED_ANALYTICS_KEYS.has(normalizedKey)
-                || normalizedKey.includes('question')
-                || normalizedKey.includes('content')
-                || normalizedKey.includes('token')
-                || normalizedKey.includes('secret')
-                || normalizedKey.includes('password')) return;
-            if (typeof value === 'string') {
-                safePayload[key] = value.slice(0, 80);
-                return;
-            }
-            if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
-                safePayload[key] = value;
-            }
-        });
-        return safePayload;
+        return ModernCore.sanitizeAnalyticsPayload(payload);
     }
 
     function trackEvent(eventName, payload = {}) {
@@ -473,51 +492,479 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateQuestionGuide() {
-        if (!questionGuide) return;
         const text = questionInput.value.trim();
         const analysis = analyzeQuestionDraft(text);
-        const shouldShowCoach = text.length > 0 && (text.length >= 8 || analysis.hasEvent || analysis.hasDirection);
-        questionGuide.hidden = text.length === 0;
         if (questionCoach) {
-            questionCoach.hidden = !shouldShowCoach;
+            questionCoach.hidden = !state.coachOpen;
         }
 
         if (!text) {
-            questionGuide.textContent = '先写这件事本身，再补一句你最担心什么，会更容易解。';
             updateQuestionCoach();
+            updateBackgroundContextCard();
             return;
         }
 
         if (!analysis.hasEvent) {
-            questionGuide.textContent = '可以再写具体一点：这件事是什么、你现在最怕什么。';
             updateQuestionCoach();
+            updateBackgroundContextCard();
             return;
         }
 
-        if (!/(要不要|该不该|会不会|能不能|适不适合|怎么办|怎么做|往哪边|继续|放弃|主动|等待)/.test(text)) {
-            questionGuide.textContent = '再补一句你最想知道的方向，比如要不要、该不该、会不会。';
+        if (!/(要不要|该不该|会不会|能不能|适不适合|怎么办|怎么做|怎么样|往哪边|继续|放弃|主动|等待)/.test(text)) {
             updateQuestionCoach();
+            updateBackgroundContextCard();
             return;
         }
 
         if (!/(担心|害怕|怕|纠结|卡|放不下|犹豫|焦虑|更累|后悔)/.test(text)) {
-            questionGuide.textContent = '已经能问了。愿意的话，再加一句你最担心什么，会更贴近你。';
             updateQuestionCoach();
+            updateBackgroundContextCard();
             return;
         }
 
-        questionGuide.textContent = '这样问就可以了：具体、只问一件事，也说出了你在意的点。';
         updateQuestionCoach();
+        updateBackgroundContextCard();
+    }
+
+    function getContextNoteParts() {
+        const situationNote = String(contextSituationNote?.value || '').trim();
+        const worryNote = String(contextWorryNote?.value || '').trim();
+        return { situationNote, worryNote };
+    }
+
+    function getContextNoteText() {
+        const { situationNote, worryNote } = getContextNoteParts();
+        return [
+            situationNote ? `处境补充：${compactText(situationNote, 70)}` : '',
+            worryNote ? `担心补充：${compactText(worryNote, 70)}` : '',
+        ].filter(Boolean).join('；');
+    }
+
+    function clearContextNotes() {
+        if (contextSituationNote) contextSituationNote.value = '';
+        if (contextWorryNote) contextWorryNote.value = '';
+    }
+
+    function focusFirstContextNote() {
+        const firstEmpty = !String(contextSituationNote?.value || '').trim()
+            ? contextSituationNote
+            : contextWorryNote;
+        (firstEmpty || contextSituationNote || contextWorryNote)?.focus();
     }
 
     function analyzeQuestionDraft(text) {
-        const normalized = String(text || '').trim();
-        const hasShortIntent = SHORT_INTENT_PATTERN.test(normalized);
-        const hasEvent = normalized.length >= 12 || (normalized.length >= 4 && hasShortIntent);
-        const hasWorry = /(担心|害怕|怕|焦虑|纠结|放不下|犹豫|后悔|更累|卡住|卡在)/.test(normalized);
-        const hasDirection = /(要不要|该不该|会不会|能不能|适不适合|怎么办|怎么做|往哪边|继续|放弃|主动|等待|推进|先稳)/.test(normalized);
-        const maybeMultiple = /(还有|另外|同时|顺便|以及|和.*一起|，.*，.*，)/.test(normalized) && normalized.length > 42;
-        return { hasEvent, hasShortIntent, hasWorry, hasDirection, maybeMultiple };
+        return ModernCore.analyzeQuestionDraft(text);
+    }
+
+    function inferQuestionScenario(text) {
+        const normalized = String(text || '');
+        const presets = [
+            {
+                key: 'career_crossroad',
+                label: '收入去向',
+                match: /(没收入|收入|赚钱|工资|创业|副业|自由职业|上班|全职|兼职|现金流|养活自己)/u,
+                copy: '我听到的重点不是单纯“工作”，而是收入压力和人生方向在拉扯。先确认你更卡在哪一边。',
+            },
+            {
+                key: 'exam_result',
+                label: '结果等待',
+                match: /(考试|成绩|出分|事业单位|考公|考编|上岸|录取|笔试|面试成绩|结果)/u,
+                copy: '我听到你更像是在等一个结果落地。先确认你现在最怕的是结果本身，还是结果之后怎么安排。',
+            },
+            {
+                key: 'content',
+                label: '内容发布',
+                match: /(小红书|视频|账号|流量|爆|涨粉|粉丝|点赞|收藏|发布|笔记|内容|作品|品牌|投流|广告)/u,
+                copy: '这更像一次内容发布或账号成长的问题。补一个最在意的点，解读会更容易落到“要不要继续、怎么推进”。',
+            },
+            {
+                key: 'work',
+                label: '工作选择',
+                match: /(工作|上班|离职|辞职|跳槽|offer|面试|领导|同事|项目|招聘|职场|接不接)/u,
+                copy: '这更像工作和选择问题。补一个你最担心的后果，卦象会更容易对应到现实动作。',
+            },
+            {
+                key: 'relationship',
+                label: '关系拉扯',
+                match: /(感情|关系|对象|他|她|联系|主动|复合|分手|暧昧|朋友|伴侣|同事|前任|喜欢)/u,
+                copy: '这更像关系里的拉扯。补一个你最怕面对的点，结果会更像在讲你们之间的真实处境。',
+            },
+            {
+                key: 'cooperation',
+                label: '合作决策',
+                match: /(合作|合伙|投资|钱|报价|合同|客户|甲方|乙方|续约|买|卖|商业)/u,
+                copy: '这更像合作或利益判断。补一个你最在意的条件，解读会更聚焦边界和风险。',
+            },
+            {
+                key: 'timing',
+                label: '时机判断',
+                match: /(什么时候|哪天|最近|时机|现在|立刻|马上|等|等等|推进|先稳|会不会)/u,
+                copy: '这更像时机问题。补一个你想确认的节奏，卦象会更容易说明“现在动还是再看”。',
+            },
+        ];
+        return presets.find(item => item.match.test(normalized)) || {
+            key: 'general',
+            label: '眼前这件事',
+            copy: '我大概知道你在问一件卡住的事。补一个最在意的点，结果会更贴近你现在的处境。',
+        };
+    }
+
+    function dedupeOptions(options, limit = 4) {
+        const seen = new Set();
+        return options
+            .map(option => String(option || '').trim())
+            .filter(Boolean)
+            .filter((option) => {
+                if (seen.has(option)) return false;
+                seen.add(option);
+                return true;
+            })
+            .slice(0, limit);
+    }
+
+    function extractQuestionSubject(question, scenario = {}) {
+        const normalized = String(question || '')
+            .replace(/\s+/g, '')
+            .replace(/[。！？!?；;，,、]/g, ' ')
+            .trim();
+        if (/(上班|工作).{0,10}创业|创业.{0,10}(上班|工作)/.test(normalized)) return '上班还是创业';
+        if (/(事业单位考试|考公|考编).{0,8}(成绩|出分|结果)|(?:成绩|出分|结果).{0,8}(事业单位考试|考公|考编)/.test(normalized)) return '事业单位考试成绩';
+        if (/(没收入|没有收入|收入不稳|现金流).{0,12}(怎么办|焦虑|上班|创业)|(?:上班|创业).{0,12}(没收入|没有收入|收入不稳|现金流)/.test(normalized)) return '收入和去向';
+        const candidates = [
+            /(上班.*创业|创业.*上班)/,
+            /(事业单位考试(?:的)?成绩|事业单位考试|考试成绩|面试成绩)/,
+            /(小红书(?:笔记|视频|账号)?投流)/,
+            /((?:小红书|视频|笔记|账号|内容|作品|项目|工作|关系|合作|报价|合同|offer|收入|创业|上班|考试|成绩)[^\s]{0,4})/,
+            /(投流|发布|涨粉|流量|报价|合作|离职|跳槽|复合|表白|联系|推进|停滞|接不接|要不要|出分|上岸)/,
+        ];
+        for (const pattern of candidates) {
+            const match = normalized.match(pattern);
+            if (match && match[1]) return compactText(match[1], 12);
+        }
+        if (scenario.key === 'content') return '这次发布';
+        if (scenario.key === 'career_crossroad') return '收入和去向';
+        if (scenario.key === 'exam_result') return '考试结果';
+        if (scenario.key === 'work') return '这份工作';
+        if (scenario.key === 'relationship') return '这段关系';
+        if (scenario.key === 'cooperation') return '这次合作';
+        return '这件事';
+    }
+
+    function buildScenarioContext(question, scenario) {
+        const normalized = String(question || '');
+        const subject = extractQuestionSubject(question, scenario);
+        if (scenario.key === 'career_crossroad') {
+            return {
+                situationOptions: ['没收入，想先稳住现金流', '想上班，但又放不下创业', '不知道该先稳还是先闯'],
+                worryOptions: ['上班后没精力创业', '继续创业又没有收入', '选错方向会更焦虑', '现实压力撑不住'],
+            };
+        }
+        if (scenario.key === 'exam_result') {
+            return {
+                situationOptions: ['正在等成绩或结果', '结果快出了，心里没底', '想知道这次有没有机会'],
+                worryOptions: ['成绩不理想会受打击', '努力没有回报', '接下来不知道怎么安排', '太在意结果睡不踏实'],
+            };
+        }
+        if (scenario.key === 'content') {
+            return {
+                situationOptions: /(投流|广告|预算)/.test(normalized)
+                    ? ['刚开始投流，还看不到反馈', '已经花了一点钱，但心里没底', '数据变了，但不知道算不算有效']
+                    : ['内容刚发布，还在等反馈', '最近流量明显变差', '想判断还要不要继续发'],
+                worryOptions: /(投流|广告|预算)/.test(normalized)
+                    ? ['钱花了却没结果', '再投下去会更亏', '太早停掉会错过机会', '想知道要不要加码']
+                    : ['没人看见这件作品', '影响涨粉或变现', '继续做也没有反馈', '太早放弃会错过后劲'],
+            };
+        }
+        if (scenario.key === 'work') {
+            if (/(停滞|卡住|推进不动|没进展)/.test(normalized)) {
+                return {
+                    situationOptions: ['项目推进停住了', '方向知道但动不起来', '资源或节奏没有接上'],
+                    worryOptions: ['继续硬推会更乱', '停下来会前功尽弃', '不知道真正卡点在哪', '拖久了更难收拾'],
+                };
+            }
+            return {
+                situationOptions: ['卡在推进节奏', '卡在资源或配合', '卡在方向不确定'],
+                worryOptions: ['继续做会白费力气', '换方向又怕前功尽弃', '不知道问题到底出在哪', '拖久了会越来越难收拾'],
+            };
+        }
+        if (scenario.key === 'relationship') {
+            return {
+                situationOptions: ['对方回应不明朗', '自己想主动但怕打扰', '关系卡在不上不下'],
+                worryOptions: ['主动了反而更被动', '继续等会消耗自己', '对方其实没有同样在意', '错过一个还能靠近的机会'],
+            };
+        }
+        if (scenario.key === 'cooperation') {
+            return {
+                situationOptions: ['条件还没谈清', '机会看起来不错但不踏实', '要投入资源才有结果'],
+                worryOptions: ['答应后被动承担太多', '拒绝会错过机会', '对方条件不够清楚', '投入和回报不成正比'],
+            };
+        }
+        if (scenario.key === 'timing') {
+            return {
+                situationOptions: ['现在想动但还没把握', '事情已经拖了一阵子', '需要判断该冲还是该等'],
+                worryOptions: ['现在动会太急', '再等会错过窗口', '看不清接下来会怎么变', '自己只是被情绪推着走'],
+            };
+        }
+        return {
+            situationOptions: [`「${subject}」这件事还没看清`, '眼前有选择但不好判断', '想知道下一步怎么动'],
+            worryOptions: ['判断错了会后悔', '继续下去会更消耗', '停下来又怕错过', '不知道真正卡点在哪里'],
+        };
+    }
+
+    function summarizeOriginalQuestion(question) {
+        const text = String(question || '').trim().replace(/\s+/g, ' ');
+        if (text.length < 6) return '';
+        const parts = text
+            .split(/(?<=[。！？!?；;])|\n+/u)
+            .map(item => item.trim().replace(/[。！？!?；;]+$/g, ''))
+            .filter(Boolean);
+        const ranked = parts.length ? parts : [text];
+        const best = ranked
+            .slice()
+            .sort((a, b) => {
+                const score = value => (/(焦虑|担心|害怕|怕|纠结|迷茫|卡|烦|没底|要不要|该不该|会不会|怎么办)/.test(value) ? 20 : 0)
+                    + Math.min(value.length, 46);
+                return score(b) - score(a);
+            })[0];
+        return compactText(best, 46);
+    }
+
+    function buildContextReviewSummary(question) {
+        const text = String(question || '').trim();
+        const scenario = inferQuestionScenario(text);
+        const subject = extractQuestionSubject(text, scenario);
+        const selection = String(state.contextSelection || '').trim();
+        const worry = String(state.contextWorry || '').trim();
+        const { situationNote, worryNote } = getContextNoteParts();
+        const quote = summarizeOriginalQuestion(text);
+        const openingByScenario = {
+            content: `我现在问的是「${subject}」这件事。`,
+            career_crossroad: '我现在卡在收入压力和去向选择之间。',
+            exam_result: `我现在最牵挂的是「${subject}」这个结果。`,
+            relationship: `我现在放不下的是「${subject}」里的回应和距离。`,
+            work: `我现在卡在「${subject}」这件工作选择里。`,
+            cooperation: `我现在拿不准「${subject}」这件合作或利益判断。`,
+            timing: `我现在想判断「${subject}」到底该动还是该等。`,
+            general: `我现在想看清「${subject}」这件事。`,
+        };
+        const lines = [openingByScenario[scenario.key] || openingByScenario.general];
+        if (quote && quote !== subject) {
+            lines.push(`我原本写下的是：“${quote}”。`);
+        }
+        if (selection) {
+            lines.push(`眼前更像是：${selection}。`);
+        }
+        if (worry) {
+            lines.push(`我最担心的是：${worry}。`);
+        }
+        if (situationNote) {
+            lines.push(`我补充的处境是：${compactText(situationNote, 70)}。`);
+        }
+        if (worryNote) {
+            lines.push(`我补充的担心是：${compactText(worryNote, 70)}。`);
+        }
+        if (!selection && !worry && !situationNote && !worryNote) {
+            lines.push('我还没有补充更多背景，所以先按这句原问题来起卦。');
+        }
+        lines.push('接下来这卦会重点看：现在卡在哪里、变化会从哪里来、下一步更适合怎么动。');
+        return compactText(lines.join(''), 220);
+    }
+
+    function refreshContextReviewText() {
+        if (!state.contextReviewVisible || !contextReviewText) return;
+        const summary = buildContextReviewSummary(questionInput.value.trim());
+        state.contextReviewSummary = summary;
+        contextReviewText.textContent = summary;
+    }
+
+    function updateContextSelectionFeedback(scenario) {
+        if (!contextFeedback) return;
+        const selection = String(state.contextSelection || '').trim();
+        const worry = String(state.contextWorry || '').trim();
+        if (!selection && !worry) {
+            contextFeedback.hidden = true;
+            contextFeedback.textContent = '';
+            return;
+        }
+
+        const subject = extractQuestionSubject(questionInput.value.trim(), scenario);
+        const parts = [];
+        if (selection) parts.push(`处境：${selection}`);
+        if (worry) parts.push(`担心：${worry}`);
+        contextFeedback.textContent = `我听到「${subject}」的重点是：${parts.join('；')}。这一卦会把这层处境一起看。`;
+        contextFeedback.hidden = false;
+    }
+
+    function updateContextOptionButtons(scenario) {
+        if (!contextOptions) return;
+        const context = buildScenarioContext(questionInput.value.trim(), scenario);
+        const options = dedupeOptions(context.situationOptions, 3);
+        contextOptions.innerHTML = '';
+        options.forEach((option) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'modern-context-option';
+            button.textContent = option;
+            button.dataset.contextValue = option;
+            button.classList.toggle('is-selected', state.contextSelection === option);
+            button.addEventListener('click', () => {
+                state.contextSelection = state.contextSelection === option ? '' : option;
+                updateContextOptionButtons(scenario);
+                refreshContextReviewText();
+                trackEvent('context_option_click', {
+                    scenario: scenario.key,
+                    step: 'situation',
+                    hasSelection: Boolean(state.contextSelection),
+                });
+            });
+            contextOptions.appendChild(button);
+        });
+        if (contextWorryOptions) {
+            const worryOptions = dedupeOptions(context.worryOptions, 4);
+            contextWorryOptions.innerHTML = '';
+            worryOptions.forEach((option) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'modern-context-option';
+                button.textContent = option;
+                button.dataset.contextWorry = option;
+                button.classList.toggle('is-selected', state.contextWorry === option);
+                button.addEventListener('click', () => {
+                    state.contextWorry = state.contextWorry === option ? '' : option;
+                    updateContextOptionButtons(scenario);
+                    refreshContextReviewText();
+                    trackEvent('context_option_click', {
+                        scenario: scenario.key,
+                        step: 'worry',
+                        hasSelection: Boolean(state.contextWorry),
+                    });
+                });
+                contextWorryOptions.appendChild(button);
+            });
+        }
+        updateContextSelectionFeedback(scenario);
+    }
+
+    function renderContextPrompt(scenario, analysis, text) {
+        if (!contextPrompt || !contextPromptText) return;
+        const shouldShowContext = text.length >= 8 && (analysis.hasEvent || analysis.hasDirection || state.contextConfirming || state.contextReviewVisible);
+        contextPrompt.hidden = state.contextConfirming || !shouldShowContext;
+        if (!shouldShowContext) {
+            if (contextToggle) contextToggle.setAttribute('aria-expanded', 'false');
+            return;
+        }
+
+        const subject = extractQuestionSubject(text, scenario);
+        contextPromptText.textContent = `我先听到：${subject}。点两下确认处境和担心，解读会更贴近你。`;
+        if (contextToggle) {
+            contextToggle.textContent = state.contextPanelOpen ? '收起' : '补两步';
+            contextToggle.setAttribute('aria-expanded', String(state.contextPanelOpen));
+        }
+    }
+
+    function updateBackgroundContextCard() {
+        if (!contextCard) return;
+        const text = questionInput.value.trim();
+        const analysis = analyzeQuestionDraft(text);
+        const shouldShowContext = text.length >= 8 && (analysis.hasEvent || analysis.hasDirection || state.contextConfirming || state.contextReviewVisible);
+        const scenario = inferQuestionScenario(text);
+        renderContextPrompt(scenario, analysis, text);
+        if (!shouldShowContext) {
+            contextCard.hidden = true;
+            state.contextSelection = '';
+            state.contextWorry = '';
+            state.contextPanelOpen = false;
+            state.contextPanelDismissed = false;
+            state.contextConfirming = false;
+            state.contextReviewVisible = false;
+            state.contextReviewSummary = '';
+            if (contextReview) contextReview.hidden = true;
+            updateContextSelectionFeedback(scenario);
+            return;
+        }
+        if (!state.contextPanelDismissed) {
+            state.contextPanelOpen = true;
+        }
+        contextCard.hidden = !state.contextPanelOpen && !state.contextConfirming;
+        const context = buildScenarioContext(text, scenario);
+        const situationOptions = dedupeOptions(context.situationOptions, 3);
+        const worryOptions = dedupeOptions(context.worryOptions, 4);
+        if (state.contextSelection && !situationOptions.includes(state.contextSelection)) {
+            state.contextSelection = '';
+        }
+        if (state.contextWorry && !worryOptions.includes(state.contextWorry)) {
+            state.contextWorry = '';
+        }
+        const subject = extractQuestionSubject(text, scenario);
+        contextCard.dataset.scenario = scenario.key;
+        if (contextScene) contextScene.textContent = `${scenario.label} · ${subject}`;
+        if (contextCopy) {
+            contextCopy.textContent = `${scenario.copy} 不想补也可以直接问。`;
+        }
+        if (contextSituationNote) {
+            contextSituationNote.placeholder = `也可以自己补一句处境，比如：关于「${subject}」，现在卡在……`;
+        }
+        if (contextWorryNote) {
+            contextWorryNote.placeholder = `也可以自己补一句担心，比如：关于「${subject}」，我最怕的是……`;
+        }
+        updateContextOptionButtons(scenario);
+    }
+
+    function showPreSubmitContextStep(question) {
+        const text = String(question || '').trim();
+        if (!text) return false;
+        const summary = buildContextReviewSummary(text);
+        state.contextReviewSummary = summary;
+        state.contextReviewVisible = true;
+        updateBackgroundContextCard();
+        if (contextReview && contextReviewText) {
+            contextReviewText.textContent = summary;
+            contextReview.hidden = false;
+        }
+        setMessage('我先确认自己有没有听懂你。没问题后，再开始起卦。');
+        trackEvent('context_review_show', {
+            questionLength: text.length,
+            hasSelection: Boolean(state.contextSelection),
+            hasWorry: Boolean(state.contextWorry),
+            hasNote: Boolean(getContextNoteText()),
+        });
+        window.setTimeout(() => {
+            contextReview?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 60);
+        return true;
+    }
+
+    function buildBackgroundContextPayload(question) {
+        const text = String(question || '').trim();
+        if (!text) return null;
+        const scenario = inferQuestionScenario(text);
+        const selection = String(state.contextSelection || '').trim();
+        const worry = String(state.contextWorry || '').trim();
+        const note = getContextNoteText();
+        if (!selection && !worry && !note) return null;
+        const subject = extractQuestionSubject(text, scenario);
+        const focus = [selection ? `处境：${selection}` : '', worry ? `担心：${worry}` : ''].filter(Boolean).join('；');
+        return {
+            scenario: `${scenario.label}：${subject}`,
+            focus,
+            note: note ? compactText(note, 120) : '',
+            summary: state.contextReviewSummary ? compactText(state.contextReviewSummary, 240) : '',
+        };
+    }
+
+    function renderContextSummary(payload) {
+        if (!contextSummary || !contextSummaryText) return;
+        if (!payload || (!payload.focus && !payload.note)) {
+            contextSummary.hidden = true;
+            contextSummaryText.textContent = '';
+            return;
+        }
+        const parts = [`这件事更像「${payload.scenario || '眼前这件事'}」`];
+        if (payload.focus) parts.push(`你最在意的是「${payload.focus}」`);
+        if (payload.note) parts.push(`你补充说：${payload.note}`);
+        if (payload.summary) parts.push(`我确认到的是：${payload.summary}`);
+        contextSummaryText.textContent = `${parts.join('，')}。我会把这层背景放进卦象里一起看。`;
+        contextSummary.hidden = false;
     }
 
     function stripTrailingPunctuation(text) {
@@ -582,6 +1029,65 @@ document.addEventListener('DOMContentLoaded', () => {
         return `关于${topic}，我现在适合继续推进，还是先稳一下？`;
     }
 
+    function buildQuestionUnderstanding(question) {
+        const text = String(question || '').trim();
+        const analysis = analyzeQuestionDraft(text);
+        const eventText = analysis.hasEvent
+            ? summarizeCoachEvent(text, analysis)
+            : compactText(text || '这件事', 30);
+        const worryText = analysis.hasWorry
+            ? summarizeCoachWorry(text, analysis)
+            : '你已经把方向说清楚了，可以直接问';
+        const directionText = analysis.hasDirection
+            ? summarizeCoachDirection(text, analysis)
+            : '下一步到底怎么做';
+        const issue = eventText || compactText(text, 30) || '这件事';
+        return {
+            heard: analysis.hasEvent
+                ? `你写到的是「${eventText}」。`
+                : `我先听到「${compactText(text, 30) || '这件事'}」，还可以再补一点具体发生了什么。`,
+            stuck: `你真正卡住的是「${directionText}」，${worryText}。`,
+            calm: (!analysis.hasDirection || analysis.maybeMultiple)
+                ? '先不用急着做决定，我们先把真正要问的方向收清楚。'
+                : '你已经写出想看的方向了，我们先把担心拆小一点。',
+            issue,
+            worry: worryText,
+        };
+    }
+
+    function renderProblemUnderstanding(question) {
+        if (!understandingLayer) return;
+        const understanding = buildQuestionUnderstanding(question);
+        if (understandingHeard) understandingHeard.textContent = understanding.heard;
+        if (understandingStuck) understandingStuck.textContent = understanding.stuck;
+        if (understandingCalm) understandingCalm.textContent = understanding.calm;
+        understandingLayer.hidden = false;
+    }
+
+    function renderIntentConfirm(force = false) {
+        if (!intentConfirm || !intentConfirmText) return;
+        const text = questionInput.value.trim();
+        if (!text || !force) {
+            intentConfirm.hidden = true;
+            return;
+        }
+        const quote = summarizeOriginalQuestion(text);
+        intentConfirmText.textContent = quote
+            ? `“${quote}”`
+            : '我会先记住你写下的这一句。';
+        intentConfirm.hidden = false;
+    }
+
+    function openQuestionCoach() {
+        state.coachOpen = true;
+        updateQuestionCoach();
+        renderIntentConfirm(true);
+        if (questionCoach) questionCoach.hidden = false;
+        trackEvent('question_coach_open_manual', {
+            questionLength: questionInput.value.trim().length,
+        });
+    }
+
     function summarizeCoachEvent(text, analysis) {
         if (!text) return '还没写下具体事情';
         return analysis.hasEvent
@@ -590,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function summarizeCoachWorry(text, analysis) {
-        if (!text || !analysis.hasWorry) return '还可以补一句你最担心什么';
+        if (!text || !analysis.hasWorry) return '你已经把方向说清楚了，可以直接问';
         const worryMatch = text.match(/(?:担心|害怕|怕|焦虑|纠结|放不下|犹豫|后悔|更累|卡住|卡在)[^。！？!?；;\n]{0,28}/);
         return worryMatch ? compactText(worryMatch[0], 34) : '你已经把担心说出来了';
     }
@@ -834,8 +1340,20 @@ document.addEventListener('DOMContentLoaded', () => {
         revealComposer();
         questionInput.value = item.question;
         state.questionSource = 'recent';
+        state.contextSelection = '';
+        state.contextWorry = '';
+        state.contextPanelOpen = true;
+        state.contextPanelDismissed = false;
+        state.contextConfirming = false;
+        state.contextConfirmed = false;
+        state.contextReviewVisible = false;
+        state.contextReviewSummary = '';
+        state.coachOpen = false;
+        clearContextNotes();
+        if (contextReview) contextReview.hidden = true;
         markQuestionDraftStarted('recent');
         updateQuestionGuide();
+        renderIntentConfirm(false);
         setMessage('已经把这件事放回来了，你可以照原样问，也可以改成今晚更贴近的说法。');
         resultShell.hidden = true;
         changedShell.hidden = true;
@@ -864,6 +1382,30 @@ document.addEventListener('DOMContentLoaded', () => {
         return slot;
     }
 
+    function renderHexagramTitle(title) {
+        hexagramTitle.dataset.rawTitle = title;
+        hexagramTitle.innerHTML = '';
+        const parts = String(title || '').trim().split(/\s+/).filter(Boolean);
+        if (parts.length < 4 || !/^第.+卦$/.test(parts[0])) {
+            hexagramTitle.textContent = title || '卦象会出现在这里';
+            return;
+        }
+
+        const index = document.createElement('span');
+        index.className = 'modern-hexagram-title-index';
+        index.textContent = parts[0];
+
+        const name = document.createElement('span');
+        name.className = 'modern-hexagram-title-name';
+        name.textContent = `${parts[1]} · ${parts[2]}`;
+
+        const meta = document.createElement('span');
+        meta.className = 'modern-hexagram-title-meta';
+        meta.textContent = parts.slice(3).join(' ');
+
+        hexagramTitle.append(index, name, meta);
+    }
+
     function renderHexagram(container, yaoLines, changingPositions = []) {
         container.innerHTML = '';
         const changingSet = new Set(changingPositions);
@@ -890,7 +1432,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateChangedStory(data = {}) {
-        const currentTitle = String(hexagramTitle.textContent || '').trim();
+        const currentTitle = String(hexagramTitle.dataset.rawTitle || hexagramTitle.textContent || '').trim();
         const futureTitle = String(data.changedTitle !== undefined ? data.changedTitle : changedTitle.textContent || '').trim();
         const positionNames = formatChangingPositions(state.changingPositions);
         currentExplanation.textContent = currentTitle && currentTitle !== '正在为你起卦...'
@@ -934,6 +1476,44 @@ document.addEventListener('DOMContentLoaded', () => {
         state.pendingFollowup = null;
     }
 
+    function clearFollowupHistory() {
+        if (followupHistoryList) {
+            followupHistoryList.innerHTML = '';
+        }
+        if (followupHistory) {
+            followupHistory.hidden = true;
+        }
+    }
+
+    function addFollowupHistoryCard(nextQuestion) {
+        if (!followupHistory || !followupHistoryList) return;
+        const previousQuestion = compactText(state.question || questionEcho?.textContent || questionInput.value.trim() || '刚才这件事', 72);
+        const previousJudgment = compactText(judgmentContent?.textContent || '上一卦已经给过一个落点。', 86);
+        const next = compactText(nextQuestion || '继续看这一层', 82);
+
+        const card = document.createElement('article');
+        card.className = 'modern-followup-history-card';
+
+        const label = document.createElement('span');
+        label.className = 'modern-followup-history-label';
+        label.textContent = '上一卦留下的线索';
+
+        const summary = document.createElement('p');
+        summary.className = 'modern-followup-history-summary';
+        summary.textContent = previousJudgment;
+
+        const meta = document.createElement('small');
+        meta.className = 'modern-followup-history-meta';
+        meta.textContent = `从「${previousQuestion}」继续问：${next}`;
+
+        card.append(label, summary, meta);
+        followupHistoryList.appendChild(card);
+        while (followupHistoryList.children.length > 3) {
+            followupHistoryList.firstElementChild?.remove();
+        }
+        followupHistory.hidden = false;
+    }
+
     function showFollowupComposer(question, meta = {}) {
         if (!followupComposer || !followupQuestion) return false;
         state.pendingFollowup = {
@@ -968,6 +1548,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const pending = state.pendingFollowup || { source: 'followup', kind: 'notice' };
+        addFollowupHistoryCard(nextQuestion);
         questionInput.value = nextQuestion;
         state.questionSource = pending.source;
         markQuestionDraftStarted(pending.source);
@@ -979,6 +1560,10 @@ document.addEventListener('DOMContentLoaded', () => {
             kind: pending.kind,
             questionLength: nextQuestion.length,
         });
+        if (pending.source === 'changed_followup') {
+            startChangedFollowupInterpretation(nextQuestion, pending);
+            return;
+        }
         startDivination();
     }
 
@@ -999,57 +1584,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function compactText(text, maxLength = 56) {
-        const normalized = String(text || '').replace(/\s+/g, ' ').trim();
-        if (normalized.length <= maxLength) return normalized;
-        return `${normalized.slice(0, maxLength - 1)}…`;
+        return ModernCore.compactText(text, maxLength);
     }
 
     function stripChangedTitleFromQuestion(text) {
-        return String(text || '')
-            .replace(/^关于刚才这件事[:：]\s*/, '')
-            .replace(/[，,]\s*变卦是「[^」]+」/g, '')
-            .replace(/变卦是「[^」]+」[。.]?/g, '')
-            .replace(/[。.]?(这个变化对我意味着什么|我现在该顺着这个变化继续推进，还是先别动|接下来我最该注意什么)[？?]?$/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
+        return ModernCore.stripChangedTitleFromQuestion(text);
     }
 
     function extractConflictTag(question) {
-        const normalized = stripChangedTitleFromQuestion(question);
-        if (!normalized) return '眼前的选择';
-        const directPatterns = [
-            /(要不要[^，。！？!?；;\n]{1,12})/,
-            /(该不该[^，。！？!?；;\n]{1,12})/,
-            /(会不会[^，。！？!?；;\n]{1,12})/,
-            /(能不能[^，。！？!?；;\n]{1,12})/,
-            /(适不适合[^，。！？!?；;\n]{1,12})/,
-        ];
-        for (const pattern of directPatterns) {
-            const match = normalized.match(pattern);
-            if (match) return compactText(match[1], 18);
-        }
-
-        const versusPatterns = [
-            ['接', '不接'],
-            ['等', '不等'],
-            ['去', '不去'],
-            ['留', '不留'],
-            ['主动', '等待'],
-            ['继续', '放下'],
-            ['推进', '先稳'],
-            ['辞职', '留下'],
-            ['复合', '放下'],
-        ];
-        for (const [left, right] of versusPatterns) {
-            if (normalized.includes(left) && normalized.includes(right)) {
-                return `${left}还是${right}`;
-            }
-        }
-
-        if (/(工作|上班|离职|辞职|offer|跳槽|面试|项目|视频|账号|流量)/.test(normalized)) return '工作里的选择';
-        if (/(感情|对象|他|她|分手|复合|表白|关系|主动|联系|暧昧)/.test(normalized)) return '关系里的拉扯';
-        if (/(合作|钱|投资|报价|续约|合伙|买|卖)/.test(normalized)) return '合作里的取舍';
-        return '眼前的选择';
+        return ModernCore.extractConflictTag(question);
     }
 
     function completeShareContext(text, maxLength = 42) {
@@ -1177,6 +1720,65 @@ document.addEventListener('DOMContentLoaded', () => {
         showFollowupComposer(nextQuestion, { source: 'followup', kind });
     }
 
+    async function startChangedFollowupInterpretation(nextQuestion, pending = {}) {
+        if (state.isSubmitting) {
+            setMessage('这一层还在展开，先等它说完。');
+            trackEvent('changed_followup_ignored_inflight');
+            return;
+        }
+        if (!state.hexagramNumber) {
+            setMessage('上一卦的信息不完整了，我会重新起一卦来看。');
+            startDivination();
+            return;
+        }
+
+        const requestId = createRequestId();
+        const controller = new AbortController();
+        state.isSubmitting = true;
+        state.activeRequestId = requestId;
+        state.activeController = controller;
+        state.interpretationComplete = false;
+        state.question = nextQuestion;
+        state.backgroundContext = null;
+        if (questionEcho) questionEcho.textContent = nextQuestion;
+        renderContextSummary(null);
+        setResultActionsEnabled(false);
+        setJudgmentLoadingState(true, '正在顺着动爻继续看这一层。', '', { step: 'translate' });
+        resetInterpretationBlocks({ preserveJudgment: true });
+        renderStaticText(emotionContent, '刚才那一卦还在，这次只顺着动爻和之卦继续解释。');
+        renderStaticText(mainContent, '不用重新起卦，我会沿用本卦、动爻和之卦，回答你刚才追问的这一层。');
+        setMessage('继续沿着刚才的动爻和之卦看，不重新起卦。');
+        trackEvent('changed_followup_interpret_same_hexagram', {
+            kind: pending.kind || 'notice',
+            hexagramNumber: state.hexagramNumber,
+            changedHexagramNumber: state.changedHexagramNumber,
+            changingCount: state.changingPositions.length,
+        });
+
+        try {
+            await startInterpretation(requestId, controller);
+        } catch (error) {
+            if (error?.name === 'AbortError' || !isActiveRequest(requestId)) {
+                return;
+            }
+            setMessage('卦已经起好，但这一层大白话暂时没连上。可以稍后再试，或换个追问。');
+            renderInterpretationFailure();
+            trackEvent('divine_error', {
+                stage: 'changed_followup_interpret',
+                errorCode: error?.name || 'unknown_error',
+            });
+        } finally {
+            if (isActiveRequest(requestId)) {
+                state.isSubmitting = false;
+                state.activeController = null;
+                state.activeRequestId = null;
+            }
+            if (statusPill.textContent !== '已解读') {
+                setSubmitState('帮我看清这件事', false);
+            }
+        }
+    }
+
     function extractSection(text, startMarker, endMarkers = []) {
         const startIndex = text.indexOf(startMarker);
         if (startIndex === -1) return '';
@@ -1262,74 +1864,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return (shortMatch ? shortMatch[1] : normalized).trim();
     }
 
-    function isUsableJudgmentCandidate(text) {
-        const candidate = String(text || '').trim();
-        if (!candidate) return false;
-        if (candidate.length < 6) return false;
-        if (candidate.length > 52) return false;
-        if (/[：:]\s*$/.test(candidate)) return false;
-        if (/[，、（(]\s*$/.test(candidate)) return false;
-        if (WEAK_JUDGMENT_PATTERN.test(candidate)) return false;
-        if (/(你现在卡在哪里|这件事的势头|你最该注意|你可以怎么做|给你一句话)/.test(candidate)) {
-            return false;
-        }
-        return true;
+    function addsUnstatedConcreteFact(text, questionText = '') {
+        return ModernCore.addsUnstatedConcreteFact(text, questionText);
+    }
+
+    function isUsableJudgmentCandidate(text, questionText = '') {
+        return ModernCore.isUsableJudgmentCandidate(text, questionText);
     }
 
     function pickContextualFallback(fallbacks, seed = '') {
-        if (!fallbacks.length) return '先别急着定，这件事还要再看清一点。';
-        const normalized = String(seed || '');
-        const score = Array.from(normalized).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-        return fallbacks[score % fallbacks.length];
+        return ModernCore.pickContextualFallback(fallbacks, seed);
     }
 
     function getContextualFallbackJudgment(question) {
-        const normalized = String(question || '');
-        const workFallbacks = [
-            '先别急着接招，先看清边界。',
-            '这不是能力不够，是节奏还没对齐。',
-            '先稳住自己的位置，再决定要不要往前。',
-        ];
-        const loveFallbacks = [
-            '别急着证明关系，先看清回应。',
-            '先把自己放稳，再看对方有没有接住你。',
-            '关系不是靠用力撑住的，先看它有没有回应。',
-        ];
-        const choiceFallbacks = [
-            '现在不是没答案，是选项还没摆清。',
-            '先别急着选，先看哪条路更消耗你。',
-            '答案还没落地，先把代价看明白。',
-        ];
-        const dealFallbacks = [
-            '先把条件说清，再决定要不要往前。',
-            '这件事可以谈，但边界要先落下来。',
-            '别先替对方让步，先把自己的底线说清。',
-        ];
-
-        if (/(工作|上班|离职|辞职|offer|跳槽|面试|领导|同事|招聘|项目|视频|账号|流量|爆)/.test(normalized)) {
-            return pickContextualFallback(workFallbacks, normalized);
-        }
-        if (/(感情|对象|他|她|分手|复合|表白|关系|主动|联系|暧昧|伴侣|朋友)/.test(normalized)) {
-            return pickContextualFallback(loveFallbacks, normalized);
-        }
-        if (/(合作|钱|投资|报价|续约|合伙|买|卖|合同)/.test(normalized)) {
-            return pickContextualFallback(dealFallbacks, normalized);
-        }
-        if (/(要不要|该不该|选|接不接|去不去|买不买|卖不卖|留不留)/.test(normalized)) {
-            return pickContextualFallback(choiceFallbacks, normalized);
-        }
-
-        return pickContextualFallback([
-            '先别急着定，这件事还要再看清一点。',
-            '你不用马上有答案，先把局面看清。',
-            '先稳住心，再看下一步该往哪走。',
-        ], normalized);
+        return ModernCore.getContextualFallbackJudgment(question);
     }
 
     function deriveFallbackJudgment(mainText, emotionText, questionText = '') {
         const normalizedMain = String(mainText || '').replace(/\r/g, '');
         const directSections = [
             extractSection(normalizedMain, '给你一句话：'),
+            extractSection(normalizedMain, '现在可以先怎样看：', ['给你一句话：']),
             extractSection(normalizedMain, '你可以怎么做：', ['给你一句话：']),
         ];
 
@@ -1338,14 +1893,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
             const candidate = cleanJudgmentCandidate(section);
-            if (isUsableJudgmentCandidate(candidate)) return candidate;
+            if (isUsableJudgmentCandidate(candidate, questionText)) return candidate;
         }
 
         const emotionCandidate = cleanJudgmentCandidate(emotionText);
-        if (isUsableJudgmentCandidate(emotionCandidate)) return emotionCandidate;
+        if (isUsableJudgmentCandidate(emotionCandidate, questionText)) return emotionCandidate;
 
         const firstLineCandidate = cleanJudgmentCandidate(normalizedMain);
-        if (isUsableJudgmentCandidate(firstLineCandidate)) return firstLineCandidate;
+        if (isUsableJudgmentCandidate(firstLineCandidate, questionText)) return firstLineCandidate;
 
         return getContextualFallbackJudgment(questionText);
     }
@@ -1363,7 +1918,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (judgmentText && isJudgmentStable) {
             const cleanedJudgment = cleanJudgmentCandidate(judgmentText, { requireComplete: !allowFallback });
-            if (isUsableJudgmentCandidate(cleanedJudgment)) {
+            if (isUsableJudgmentCandidate(cleanedJudgment, state.question)) {
                 const supportLine = firstCompleteSentence(emotionText, 72);
                 setJudgmentLoadingState(false, cleanedJudgment, supportLine);
             } else if (allowFallback) {
@@ -1407,8 +1962,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shareBtn) shareBtn.disabled = true;
         if (rephraseBtn) rephraseBtn.disabled = false;
         if (resetBtn) resetBtn.disabled = false;
-        setStatus('卦已起好');
-        setSubmitState('立即算一算', false);
+        setStatus('已经有一个方向');
+        setSubmitState('帮我看清这件事', false);
     }
 
     async function startInterpretation(requestId, controller) {
@@ -1434,6 +1989,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 hexagramNumber: state.hexagramNumber,
                 changingPositions: state.changingPositions,
                 changedHexagramNumber: state.changedHexagramNumber,
+                backgroundContext: state.backgroundContext,
             }),
         });
 
@@ -1498,7 +2054,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.interpretationComplete = true;
         setResultActionsEnabled(true);
         setStatus('已解读');
-        setSubmitState('立即算一算', false);
+        setSubmitState('帮我看清这件事', false);
         trackEvent('interpret_complete', {
             hexagramNumber: state.hexagramNumber,
             changingCount: state.changingPositions.length,
@@ -1531,6 +2087,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!state.contextConfirmed && showPreSubmitContextStep(question)) {
+            return;
+        }
+        state.contextReviewVisible = false;
+        if (contextReview) contextReview.hidden = true;
+
         const requestId = createRequestId();
         const controller = new AbortController();
         state.isSubmitting = true;
@@ -1539,19 +2101,23 @@ document.addEventListener('DOMContentLoaded', () => {
         state.interpretationComplete = false;
         setResultActionsEnabled(false);
         hideFollowupComposer();
+        state.backgroundContext = buildBackgroundContextPayload(question);
 
         trackEvent('submit_click', {
             questionSource: state.questionSource,
             helperOpen: Boolean(questionHelper?.open),
+            hasBackgroundContext: Boolean(state.backgroundContext),
         });
 
-        setSubmitState('正在起卦...', true, { loading: true });
+        setSubmitState('正在整理你的问题...', true, { loading: true });
         setMessage('');
-        setStatus('正在起卦');
+        setStatus('正在整理你的问题');
         resultShell.hidden = false;
         scrollToResult();
         questionEcho.textContent = question;
-        hexagramTitle.textContent = '正在为你起卦...';
+        renderProblemUnderstanding(question);
+        renderContextSummary(state.backgroundContext);
+        renderHexagramTitle('如果你想看卦理依据');
         hexagramLines.innerHTML = '';
         changingWarning.hidden = true;
         changingWarning.textContent = '';
@@ -1599,7 +2165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 hasChanging: state.changingPositions.length > 0,
             });
 
-            hexagramTitle.textContent = data.title;
+            renderHexagramTitle(data.title);
             renderHexagram(hexagramLines, data.yaoLines || [], state.changingPositions);
 
             if (state.changingPositions.length > 0) {
@@ -1621,7 +2187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 changedFollowupCopy.textContent = '不用自己查原文。这里的动爻就是这件事最容易变化的地方，你可以直接顺着它继续问。';
             }
 
-            showJudgmentProgress('translate', '卦象已成，正在把它翻译成你能听懂的话。');
+            showJudgmentProgress('translate', '已经有一个方向，正在把它翻译成你能听懂的话。');
             await startInterpretation(requestId, controller);
         } catch (error) {
             if (error?.name === 'AbortError' || !isActiveRequest(requestId)) {
@@ -1630,7 +2196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (error?.code === 'LOGIN_REQUIRED') {
                 setMessage('免费体验已经用过了。登录后可以继续问、追问或换个问法。');
                 setStatus('需要登录');
-                setSubmitState('立即算一算', false);
+                setSubmitState('帮我看清这件事', false);
                 showAuthModal(() => startDivination());
                 trackEvent('auth_required', { trigger: 'submit' });
                 return;
@@ -1657,14 +2223,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.activeRequestId = null;
             }
             if (statusPill.textContent !== '已解读') {
-                setSubmitState('立即算一算', false);
+                setSubmitState('帮我看清这件事', false);
             }
         }
     }
 
     async function saveShareImage() {
         if (!state.interpretationComplete) {
-            setMessage('等这一卦解完，再保存心安卡片会更完整。');
+            setMessage('等这一卦解完，再保存心安屿卡片会更完整。');
             return;
         }
 
@@ -1676,7 +2242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof window.html2canvas === 'undefined') {
             shareBtn.textContent = '截图插件未就绪';
             window.setTimeout(() => {
-                shareBtn.textContent = '保存心安卡片';
+                shareBtn.textContent = '保存心安屿卡片';
             }, 1600);
             return;
         }
@@ -1699,7 +2265,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body.classList.remove('share-mode');
             const link = document.createElement('a');
             link.href = canvas.toDataURL('image/png');
-            link.download = `心安卡片_${Date.now()}.png`;
+            link.download = `心安屿卡片_${Date.now()}.png`;
             link.click();
             didSave = true;
             trackEvent('share_generate_success', {
@@ -1736,7 +2302,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         setMessage('');
         setStatus('等你开口');
-        setSubmitState('立即算一算', false);
+        setSubmitState('帮我看清这件事', false);
         questionInput.value = '';
         state.question = '';
         state.hexagramNumber = null;
@@ -1746,7 +2312,21 @@ document.addEventListener('DOMContentLoaded', () => {
         state.hasTrackedQuestionStart = false;
         state.hasTrackedDraftStart = false;
         state.interpretationComplete = false;
+        state.contextSelection = '';
+        state.contextWorry = '';
+        state.contextPanelOpen = false;
+        state.contextPanelDismissed = false;
+        state.contextConfirming = false;
+        state.contextConfirmed = false;
+        state.contextReviewVisible = false;
+        state.contextReviewSummary = '';
+        state.backgroundContext = null;
+        clearContextNotes();
+        if (contextReview) contextReview.hidden = true;
+        renderContextSummary(null);
+        updateBackgroundContextCard();
         hideFollowupComposer();
+        clearFollowupHistory();
         resultShell.hidden = true;
         changedShell.hidden = true;
         changedShell.open = false;
@@ -1770,6 +2350,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         setMessage('');
         hideFollowupComposer();
+        clearFollowupHistory();
         resultShell.hidden = true;
         changedShell.hidden = true;
         changedShell.open = false;
@@ -1792,8 +2373,20 @@ document.addEventListener('DOMContentLoaded', () => {
             revealComposer();
             state.questionSource = 'chip';
             questionInput.value = button.dataset.question || '';
+            state.contextSelection = '';
+            state.contextWorry = '';
+            state.contextPanelOpen = true;
+            state.contextPanelDismissed = false;
+            state.contextConfirming = false;
+            state.contextConfirmed = false;
+            state.contextReviewVisible = false;
+            state.contextReviewSummary = '';
+            state.coachOpen = false;
+            clearContextNotes();
+            if (contextReview) contextReview.hidden = true;
             markQuestionDraftStarted('chip');
             updateQuestionGuide();
+            renderIntentConfirm(false);
             questionInput.focus();
             questionInput.setSelectionRange(questionInput.value.length, questionInput.value.length);
             trackEvent('chip_click', {
@@ -1808,8 +2401,20 @@ document.addEventListener('DOMContentLoaded', () => {
             revealComposer();
             state.questionSource = 'helper_template';
             questionInput.value = template;
+            state.contextSelection = '';
+            state.contextWorry = '';
+            state.contextPanelOpen = true;
+            state.contextPanelDismissed = false;
+            state.contextConfirming = false;
+            state.contextConfirmed = false;
+            state.contextReviewVisible = false;
+            state.contextReviewSummary = '';
+            state.coachOpen = false;
+            clearContextNotes();
+            if (contextReview) contextReview.hidden = true;
             markQuestionDraftStarted('helper_template');
             updateQuestionGuide();
+            renderIntentConfirm(false);
             questionInput.focus();
             const caretIndex = questionInput.value.indexOf('：') + 1 || questionInput.value.length;
             questionInput.setSelectionRange(caretIndex, caretIndex);
@@ -1823,6 +2428,48 @@ document.addEventListener('DOMContentLoaded', () => {
             applyCoachPrompt(button.dataset.coachField || 'direction');
         });
     });
+    contextToggle?.addEventListener('click', () => {
+        state.contextPanelOpen = !state.contextPanelOpen;
+        state.contextPanelDismissed = !state.contextPanelOpen;
+        updateBackgroundContextCard();
+        trackEvent(state.contextPanelOpen ? 'context_prompt_open' : 'context_prompt_close', {
+            questionLength: questionInput.value.trim().length,
+        });
+        if (state.contextPanelOpen) {
+            window.setTimeout(() => {
+                contextCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 60);
+        }
+    });
+    contextReviewEdit?.addEventListener('click', () => {
+        state.contextConfirmed = false;
+        state.contextReviewVisible = false;
+        if (contextReview) contextReview.hidden = true;
+        state.contextPanelOpen = true;
+        state.contextPanelDismissed = false;
+        updateBackgroundContextCard();
+        setMessage('可以再补一句，或者点一下最像你处境的选项。');
+        trackEvent('context_review_edit');
+        window.setTimeout(() => {
+            contextCard?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            focusFirstContextNote();
+        }, 80);
+    });
+    contextReviewConfirm?.addEventListener('click', () => {
+        state.contextConfirmed = true;
+        state.contextReviewVisible = false;
+        if (contextReview) contextReview.hidden = true;
+        trackEvent('context_review_confirm', {
+            hasSelection: Boolean(state.contextSelection),
+            hasWorry: Boolean(state.contextWorry),
+            hasNote: Boolean(getContextNoteText()),
+        });
+        startDivination();
+    });
+    [contextSituationNote, contextWorryNote].forEach((noteInput) => noteInput?.addEventListener('input', () => {
+        state.contextConfirmed = false;
+        refreshContextReviewText();
+    }));
     followupButtons.forEach(button => {
         button.addEventListener('click', () => {
             followupFlow(button.dataset.followup || 'notice');
@@ -1869,6 +2516,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+    changedDirectFollowup?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        changedFollowupFlow(changedDirectFollowup.dataset.changedFollowup || 'meaning');
+    });
     changedFollowupButtons.forEach((button) => {
         button.addEventListener('click', () => {
             changedFollowupFlow(button.dataset.changedFollowup || 'meaning');
@@ -1885,7 +2537,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.questionSource !== 'manual' && !state.questionSource.endsWith('_edited')) {
             state.questionSource = `${state.questionSource}_edited`;
         }
+        state.contextSelection = '';
+        state.contextWorry = '';
+        state.contextPanelDismissed = false;
+        state.contextConfirmed = false;
+        state.contextConfirming = false;
+        state.contextReviewVisible = false;
+        state.contextReviewSummary = '';
+        if (contextReview) contextReview.hidden = true;
+        state.coachOpen = false;
         updateQuestionGuide();
+        renderIntentConfirm(false);
         if (questionInput.value.trim().length > 0) {
             markQuestionDraftStarted('manual');
         }
@@ -1903,7 +2565,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderRecentQuestions();
     setResultActionsEnabled(false);
     setStatus('等你开口');
-    setSubmitState('立即算一算', false);
+    setSubmitState('帮我看清这件事', false);
     loadAuthState();
     trackEvent('page_view', {
         isReturning: readRecentQuestions().length > 0,

@@ -88,7 +88,7 @@ function buildProductInsights(metrics) {
     { name: '输入后提交', numerator: submitted, denominator: inputStarted, advice: '用户写了但没提交，可能是不确定这样问行不行，需要更强的“这个问题已经能问了”反馈。' },
     { name: '提交后起卦成功', numerator: divineSuccess, denominator: submitted, advice: '起卦失败会直接伤主链路，需要优先查接口和错误提示。' },
     { name: '起卦后解读完成', numerator: interpreted, denominator: divineSuccess, advice: '解读完成率低通常是 AI 慢、断流或等待反馈不够安定。' },
-    { name: '解读后保存心安卡片', numerator: shared, denominator: interpreted, advice: '保存率低说明分享卡不够戳，优先优化落点和治愈摘句。' },
+    { name: '解读后保存心安屿卡片', numerator: shared, denominator: interpreted, advice: '保存率低说明分享卡不够戳，优先优化落点和治愈摘句。' },
   ];
 
   const weakest = findWeakestStep(funnelSteps);
@@ -106,7 +106,7 @@ function buildProductInsights(metrics) {
     nextActions.push('提问助手打开率偏低，可以把“帮我问清楚”的提示做得更像即时陪写，而不是折叠说明。');
   }
   if (saveRate < 20 && interpreted > 0) {
-    nextActions.push('保存率偏低，优先检查心安卡片是否有一句足够治愈、能发出去的话。');
+    nextActions.push('保存率偏低，优先检查心安屿卡片是否有一句足够治愈、能发出去的话。');
   }
   if (followRate < 15 && interpreted > 0) {
     nextActions.push('追问率偏低，可以把同一件事追问按钮改得更贴近用户的真实下一问。');
@@ -155,8 +155,9 @@ const openedHelper = uniqueSessions(events, 'question_helper_open');
 const openedChanged = uniqueSessions(events, 'changed_shell_open');
 
 const submitEvents = events.filter(item => item.event === 'submit_click');
-const avgQuestionLength = submitEvents.length
-  ? Math.round(submitEvents.reduce((sum, item) => sum + (Number(item.payload?.questionLength) || 0), 0) / submitEvents.length)
+const validQuestionLengthEvents = submitEvents.filter(item => Number(item.payload?.questionLength) > 0);
+const avgQuestionLength = validQuestionLengthEvents.length
+  ? Math.round(validQuestionLengthEvents.reduce((sum, item) => sum + Number(item.payload.questionLength), 0) / validQuestionLengthEvents.length)
   : 0;
 
 const sourceCounts = submitEvents.reduce((acc, item) => {
@@ -190,7 +191,7 @@ const insights = buildProductInsights({
   errors,
 });
 
-console.log('\n心安一下埋点中文汇总');
+console.log('\n心安屿埋点中文汇总');
 console.log('='.repeat(36));
 console.log(`数据文件：${logPath}`);
 console.log(`事件总数：${events.length}`);
@@ -205,7 +206,7 @@ printLine('开始输入', inputStarted, `进入后 ${percent(inputStarted, enter
 printLine('提交问卦', submitted, `输入后 ${percent(submitted, inputStarted)}`);
 printLine('起卦成功', divineSuccess, `提交后 ${percent(divineSuccess, submitted)}`);
 printLine('解读完成', interpreted, `起卦后 ${percent(interpreted, divineSuccess)}`);
-printLine('保存心安卡片', shared, `解读后 ${percent(shared, interpreted)}`);
+printLine('保存心安屿卡片', shared, `解读后 ${percent(shared, interpreted)}`);
 printLine('换个问法', rephrased, `解读后 ${percent(rephrased, interpreted)}`);
 printLine('同一件事追问', followedUp, `解读后 ${percent(followedUp, interpreted)}`);
 printLine('最近问题再问', recentClicked, `解读后 ${percent(recentClicked, interpreted)}`);

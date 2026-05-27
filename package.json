@@ -13,6 +13,7 @@
     "start": "node server.js",
     "test": "node --test",
     "analytics": "node scripts/analytics-summary.js",
+    "analytics:dashboard": "node scripts/analytics-dashboard.js",
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview"
